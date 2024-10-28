@@ -72,16 +72,81 @@ class Server
         }
 
         //  Need to look into threads for concurrent server
-        //thread()
-        clientHandler(clientSocket);
+        thread t(clientHandler, clientSocket);
+        t.detach();
       }
     }
 
     void clientHandler(int clientSocket)
     {
       char buffer[BUFFER_SIZE];
+      memset(buffer, 0, BUFFER_SIZE);
+      ssize_t bytesRead = 0;
+      string command;
+      while(bytesRead < BUFFER_SIZE)
+      {
+        	bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+          if(bytesRead <= 0)
+          {
+            cerr << "Error while reading data." << endl;
+            close(clientSocket);
+            return;
+          }
+          //  idk wtf im doing here yet, ignore pls
+          if(bytesRead == '/n')
+          {
+            command = bytesRead;
+          }
+      }
+      commandHandler(clientSocket, buffer);
+    }
 
+    void commandHandler(int clientSocket, string command)
+    {
+      if(command == "SEND")
+      {
 
+      }
+      else if(command == "LIST")
+      {
+        
+      }
+      else if(command == "READ")
+      {
+        
+      }
+      else if(command == "DEL")
+      {
+        
+      }
+      else if(command == "QUIT")
+      {
+        
+      }
+      else
+      {
+        cerr << "Invalid Method!" << endl;
+      }
+    }
+
+    void sendHandler()
+    {
+
+    }
+
+    void listHandler()
+    {
+      
+    }
+
+    void readHandler()
+    {
+      
+    }
+
+    void delHandler()
+    {
+      
     }
 
     void printUsage()
