@@ -2,9 +2,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <filesystem>
+#include <sstream>
 #include <thread>
 #include <unistd.h>
 #include <cstring>
+#include <vector>
 
 #define BUFFER_SIZE 1024
 
@@ -93,6 +95,7 @@ class Server
           if(bytesRead < 0)
           {
             cerr << "Error while reading data." << endl;
+            sendResponse(false);
             close(clientSocket);
             return;
           }
@@ -100,7 +103,7 @@ class Server
           command += buffer;
           
           //  New line means command has been read
-          if(buffer == "/n")
+          if(buffer == "\n")
           {
             break;
           }
@@ -116,15 +119,15 @@ class Server
       }
       else if(command == "LIST")
       {
-        listHandler();
+        listHandler(clientSocket);
       }
       else if(command == "READ")
       {
-        readHandler();
+        readHandler(clientSocket);
       }
       else if(command == "DEL")
       {
-        delHandler();
+        delHandler(clientSocket);
       }
       else if(command == "QUIT")
       {
@@ -147,31 +150,68 @@ class Server
     */
     void sendHandler(int clientSocket)
     {
-      int bytesRead;
-      //while()
+      vector<string> headers = parseHeader(clientSocket, 3);
+      string sender = headers[0];
+      string receiver = headers[1];
+      string subject = headers[2];
     }
 
-    void listHandler()
+    void listHandler(int clientSocket)
     {
-      
+      vector<string> headers = parseHeader(clientSocket, 1);
+      string username = headers[0];
+
     }
 
-    void readHandler()
+    void readHandler(int clientSocket)
     {
-      
+      parseHeader(clientSocket, 2);
     }
 
-    void delHandler()
+    void delHandler(int clientSocket)
     {
-      
+      parseHeader(clientSocket, 2);
     }
 
-    string parser(int clientSocket)
+    vector<string> parseHeader(int clientSocket, int headerAmount)
     {
-      
+      vector<string> headers;
+
+      //  Buffer reads the data, bytesRead determines the actual number of bytes read
+      char buffer[BUFFER_SIZE];
+      //  Clear the buffer and read up to buffer_size - 1 bytes
+      memset(buffer, 0, BUFFER_SIZE);
+      ssize_t bytesRead = 0;
+      string receivedData;
+
+      while(headers.size() < headerAmount)
+      {   
+          //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
+          bytesRead = recv(bytesRead, buffer, BUFFER_SIZE - 1, 0);
+          //  Error occured while reading data
+          if(bytesRead <= 0)
+          {
+            cerr << "Error while reading data." << endl;
+            close(clientSocket);
+            return headers;
+          }
+
+          receivedData = buffer;
+      }
+
+      while(!receivedData.find("."))
+      {
+        
+      }
+      return headers;
     }
 
-    string response(bool state)
+    string parseBody(int clientSocket)
+    {
+
+    }
+
+    string sendResponse(bool state)
     {
       return state ? "OK\n" : "ERR\n";
     }
@@ -184,3 +224,18 @@ class Server
       cout << "<mail-spool-directoryname>: must be PATH value" << endl;
     }
 };
+
+int main(int argc, char *argv[])
+{
+  //  Check for missing arguments
+  if(argc != 3)
+  {
+    cerr << "Invalid Input!" << endl;
+    return -1;
+  }
+
+  Server server(stoi(argv[1]), argv[2]);
+  server.start();
+
+  return 0;
+}
