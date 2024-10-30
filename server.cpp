@@ -79,49 +79,56 @@ class Server
 
     void clientHandler(int clientSocket)
     {
+      //  Buffer reads the data, bytesRead determines the actual number of bytes read
       char buffer[BUFFER_SIZE];
+      //  Clear the buffer and read up to buffer_size - 1 bytes
       memset(buffer, 0, BUFFER_SIZE);
       ssize_t bytesRead = 0;
       string command;
-      while(bytesRead < BUFFER_SIZE)
-      {
-        	bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
-          if(bytesRead <= 0)
+
+      //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
+      while((bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0)) != 0)
+      {   
+          //  Error occured while reading data      
+          if(bytesRead < 0)
           {
             cerr << "Error while reading data." << endl;
             close(clientSocket);
             return;
           }
-          //  idk wtf im doing here yet, ignore pls
-          if(bytesRead == '/n')
+
+          command += buffer;
+          
+          //  New line means command has been read
+          if(command == "/n")
           {
-            command = bytesRead;
+            break;
           }
       }
-      commandHandler(clientSocket, buffer);
+      commandHandler(clientSocket, command);
     }
 
     void commandHandler(int clientSocket, string command)
     {
       if(command == "SEND")
       {
-
+        sendHandler();
       }
       else if(command == "LIST")
       {
-        
+        listHandler();
       }
       else if(command == "READ")
       {
-        
+        readHandler();
       }
       else if(command == "DEL")
       {
-        
+        delHandler();
       }
       else if(command == "QUIT")
       {
-        
+        //  probably doesn't need its own function
       }
       else
       {
@@ -129,9 +136,18 @@ class Server
       }
     }
 
+    /*
+    SEND\n 
+    <Sender>\n 
+    <Receiver>\n 
+    <Subject (max. 80 chars)>\n 
+    <message (multi-line; no length restrictions)\n> 
+    .\n  
+    */
     void sendHandler()
     {
-
+      int bytesRead;
+      //while()
     }
 
     void listHandler()
