@@ -21,6 +21,7 @@ class Server
     string mailSpoolDir;
     int serverSocket = -1;
     int reuseValue = 1;
+    int abortRequested = 0;
 
   public:
     Server(int port, string mailSpoolDir)
@@ -44,7 +45,7 @@ class Server
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
       {
-          perror("set socket options - reuseAddr");
+          cerr << "Set socket options - reuseAddr" << endl;
           return false;
       }
 
@@ -54,7 +55,7 @@ class Server
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
       {
-          perror("set socket options - reusePort");
+          cerr << "Set socket options - reusePort" << endl;
           return false;
       }
 
@@ -85,26 +86,32 @@ class Server
       }
 
       //  Accept client
-      acceptClients(serverSocket);
+      if(!acceptClients(serverSocket))
+      {
+        return false;
+      }
       close(serverSocket);
       return true;
     }
 
-    void acceptClients(int serverSocket)
+    bool acceptClients(int serverSocket)
     {
-      while(1)
+      while(!abortRequested)
       {
+        cout << "Listening for client connections..." << endl;
         int clientSocket = accept(serverSocket, nullptr, nullptr);
         if (clientSocket < 0) 
         {
           cerr << "Error accepting client connection." << endl;
-          return;
+          return false;
         }
 
         //  Need to look into threads for concurrent server
-        thread t(clientHandler, clientSocket);
-        t.detach();
+        //thread t(clientHandler, clientSocket);
+        //t.detach();
+        clientHandler(clientSocket);
       }
+        return true;
     }
 
     void clientHandler(int clientSocket)
