@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <sstream>
 #include <thread>
+#include <signal.h>
 #include <unistd.h>
 #include <cstring>
 #include <vector>
@@ -17,22 +18,49 @@ class Server
 {
   private:
     int port;
-    path mailSpoolDir;
+    string mailSpoolDir;
+    int serverSocket = -1;
+    int reuseValue = 1;
 
   public:
-    Server(int port, path mailSpoolDir)
+    Server(int port, string mailSpoolDir)
     {
       this->port = port;
       this->mailSpoolDir = mailSpoolDir;
     }
 
-    void start()
+    bool start()
     {
       //  Create a new socket
-      int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-      
+      if((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+      {
+        cerr << "Error while creating socket" << endl;
+        return false;
+      }
+
+      if (setsockopt(serverSocket,
+                      SOL_SOCKET,
+                      SO_REUSEADDR,
+                      &reuseValue,
+                      sizeof(reuseValue)) == -1)
+      {
+          perror("set socket options - reuseAddr");
+          return false;
+      }
+
+      if (setsockopt(serverSocket,
+                      SOL_SOCKET,
+                      SO_REUSEPORT,
+                      &reuseValue,
+                      sizeof(reuseValue)) == -1)
+      {
+          perror("set socket options - reusePort");
+          return false;
+      }
+
       //  AF_INET = IPv4
       sockaddr_in serverAddress;
+      memset(&serverAddress, 0, sizeof(serverAddress));
       serverAddress.sin_family = AF_INET;
       serverAddress.sin_port = htons(this->port);
       serverAddress.sin_addr.s_addr = INADDR_ANY;
@@ -45,7 +73,7 @@ class Server
       {
         cerr << "Error while binding socket." << endl;
         close(serverSocket);
-        return;
+        return false;
       }
 
       //  Listen for incoming clients
@@ -53,13 +81,13 @@ class Server
       {
         cerr << "Error while listening for clients." << endl;
         close(serverSocket);
-        return;
+        return false;
       }
 
       //  Accept client
       acceptClients(serverSocket);
-      
       close(serverSocket);
+      return true;
     }
 
     void acceptClients(int serverSocket)
@@ -231,11 +259,33 @@ int main(int argc, char *argv[])
   if(argc != 3)
   {
     cerr << "Invalid Input!" << endl;
-    return -1;
+    return EXIT_FAILURE;
+  }
+ 
+  int port;
+  istringstream ss(argv[1]);
+  if(!(ss >> port) || port <= 0)
+  {
+    cerr << "Invalid port number. Please enter a number." << endl;
+    return EXIT_FAILURE;
   }
 
-  Server server(stoi(argv[1]), argv[2]);
-  server.start();
+  ////////////////////////////////////////////////////////////////////////////
+  // SIGNAL HANDLER
+  // SIGINT (Interrupt: ctrl+c)
+  // https://man7.org/linux/man-pages/man2/signal.2.html
+  /*if (signal(SIGINT, signalHandler) == SIG_ERR)
+  {
+    perror("signal can not be registered");
+    return EXIT_FAILURE;
+  }*/
 
-  return 0;
+  Server server(port, argv[2]);
+  if(!(server.start()))
+  {
+    cerr << "Server failed to start" << endl;
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
 }
