@@ -1,6 +1,5 @@
 #include <iostream>
 #include <server.cpp>
-#include <client.cpp>
 
 using namespace std;
 
