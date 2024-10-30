@@ -100,7 +100,7 @@ class Server
           command += buffer;
           
           //  New line means command has been read
-          if(command == "/n")
+          if(buffer == "/n")
           {
             break;
           }
@@ -112,7 +112,7 @@ class Server
     {
       if(command == "SEND")
       {
-        sendHandler();
+        sendHandler(clientSocket);
       }
       else if(command == "LIST")
       {
@@ -128,7 +128,8 @@ class Server
       }
       else if(command == "QUIT")
       {
-        //  probably doesn't need its own function
+        cout << "Closing Server..." << endl;
+        close(clientSocket);
       }
       else
       {
@@ -144,7 +145,7 @@ class Server
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
-    void sendHandler()
+    void sendHandler(int clientSocket)
     {
       int bytesRead;
       //while()
@@ -163,6 +164,16 @@ class Server
     void delHandler()
     {
       
+    }
+
+    string parser(int clientSocket)
+    {
+      
+    }
+
+    string response(bool state)
+    {
+      return state ? "OK\n" : "ERR\n";
     }
 
     void printUsage()
