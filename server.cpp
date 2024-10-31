@@ -116,54 +116,34 @@ class Server
 
     bool clientHandler(int clientSocket)
     {
-      //  Buffer reads the data, bytesRead determines the actual number of bytes read
-      char buffer[BUFFER_SIZE];
-      //  Clear the buffer and read up to buffer_size - 1 bytes
-      memset(buffer, 0, BUFFER_SIZE);
-      ssize_t bytesRead = 0;
-      string command;
-
-      //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
-      while((bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0)) != 0)
-      {   
-          //  Error occured while reading data      
-          if(bytesRead < 0)
-          {
-            cerr << "Error while reading data." << endl;
-            sendResponse(false);
-            close(clientSocket);
-            return false;
-          }
-
-          command += buffer;
-          
-          //  New line means command has been read
-          if(buffer == "\n")
-          {
-            break;
-          }
+      vector<string> body = parser(clientSocket);
+      if(body.empty())
+      {
+        return false;
       }
-      commandHandler(clientSocket, command);
+      commandHandler(clientSocket, body);
       return true;
     }
 
-    void commandHandler(int clientSocket, string command)
+    void commandHandler(int clientSocket, vector<string> body)
     {
+      string command = body[0];
+
       if(command == "SEND")
       {
-        sendHandler(clientSocket);
+        sendHandler(clientSocket, body);
       }
       else if(command == "LIST")
       {
-        listHandler(clientSocket);
+        listHandler(clientSocket, body);
       }
       else if(command == "READ")
       {
-        readHandler(clientSocket);
+        readHandler(clientSocket, body);
       }
       else if(command == "DEL")
       {
-        delHandler(clientSocket);
+        delHandler(clientSocket, body);
       }
       else if(command == "QUIT")
       {
@@ -172,7 +152,7 @@ class Server
       }
       else
       {
-        cerr << "Invalid Method!" << endl;
+        cerr << "Invalid Command!" << endl;
       }
     }
 
@@ -184,29 +164,27 @@ class Server
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
-    void sendHandler(int clientSocket)
+    void sendHandler(int clientSocket, vector<string> body)
     {
-      vector<string> headers = parser(clientSocket);
-      string sender = headers[0];
-      string receiver = headers[1];
-      string subject = headers[2];
+      string sender = body[0];
+      string receiver = body[1];
+      string subject = body[2];
     }
 
-    void listHandler(int clientSocket)
+    void listHandler(int clientSocket, vector<string> body)
     {
-      vector<string> headers = parser(clientSocket);
-      string username = headers[0];
+      string username = body[0];
 
     }
 
-    void readHandler(int clientSocket)
+    void readHandler(int clientSocket, vector<string> body)
     {
-      parser(clientSocket);
+      
     }
 
-    void delHandler(int clientSocket)
+    void delHandler(int clientSocket, vector<string> body)
     {
-      parser(clientSocket);
+      
     }
 
     vector<string> parser(int clientSocket)
