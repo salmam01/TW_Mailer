@@ -15,14 +15,14 @@ using namespace std;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define BUF 1024
+#define BUFFER_SIZE 1024
 
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char **argv)
 {
    int create_socket;
-   char buffer[BUF];
+   char buffer[BUFFER_SIZE];
    struct sockaddr_in address;
    int size;
    int isQuit = 0;
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
    ////////////////////////////////////////////////////////////////////////////
    // RECEIVE DATA
    // https://man7.org/linux/man-pages/man2/recv.2.html
-   size = recv(create_socket, buffer, BUF - 1, 0);
+   size = recv(create_socket, buffer, BUFFER_SIZE - 1, 0);
    if (size == -1)
    {
       perror("recv error");
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
       buffer[size] = '\0';
       printf("%s", buffer); // ignore error
    }
-   memset(buffer, 0, BUF);
+   memset(buffer, 0, BUFFER_SIZE);
 
    do
    {
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
          if(!isQuit){
 
             while(true){
-               size = recv(create_socket, buffer, BUF - 1, 0);
+               size = recv(create_socket, buffer, BUFFER_SIZE - 1, 0);
 
             if (size == -1)
             {
@@ -161,17 +161,17 @@ int main(int argc, char **argv)
                char *output = NULL;
                output = strstr (buffer,"<< OK");
                if(output) {
-                  memset(buffer, 0, BUF);
+                  memset(buffer, 0, BUFFER_SIZE);
                   break;
                }
                output = strstr (buffer,"<< ERR");
                if(output) {
-                  memset(buffer, 0, BUF);
+                  memset(buffer, 0, BUFFER_SIZE);
                   break;
                }
                output = strstr (buffer, "<< LOGIN FIRST");
                if(output) {
-                  memset(buffer, 0, BUF);
+                  memset(buffer, 0, BUFFER_SIZE);
                   break;
                }
             }

@@ -242,7 +242,7 @@ class Server
       return headers;
     }
 
-    string parseBody(int clientSocket)
+    string parseBody(int clientSocket) //code from chatty, look over it
     {
       string message;
       char buffer[BUFFER_SIZE];
@@ -268,7 +268,7 @@ class Server
     void printUsage()
     {
       cout << "** SERVER USAGE **" << endl;
-      cout << "./twmailer-server <port> <mail-spool-directoryname>" << endl;
+      cout << "./server <port> <mail-spool-directoryname>" << endl;
       cout << "<port>: must be INT value" << endl;
       cout << "<mail-spool-directoryname>: must be PATH value" << endl;
     }
