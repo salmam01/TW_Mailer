@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <filesystem>
 #include <sstream>
+#include <fstream>
 #include <thread>
 #include <signal.h>
 #include <unistd.h>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #define BUFFER_SIZE 1024
+#define MAIL_SPOOL_DIR "/mail_spool"
 
 using namespace std;
 using namespace std::filesystem;
@@ -125,6 +127,59 @@ class Server
       return true;
     }
 
+    vector<string> parser(int clientSocket)
+    {
+      vector<string> body;
+      //  Buffer reads the data, bytesRead determines the actual number of bytes read
+      char buffer[BUFFER_SIZE];
+      ssize_t bytesRead = 0;
+      stringstream receivedData;
+
+      //  Read the data and save it into the receivedData string
+      while(receivedData.str().find(".\n") == string::npos)
+      {
+        //  Clear the buffer and read up to buffer_size - 1 bytes
+        memset(buffer, 0, BUFFER_SIZE);
+        //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
+        bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+        
+        if (bytesRead <= 0) 
+        {
+            cerr << "Error while reading message body." << endl;
+            close(clientSocket);
+            body.clear();
+            return body;
+        }
+
+        buffer[bytesRead] = '\0';
+        receivedData << buffer;
+      }
+      
+      // Split by newline
+      string line;
+      int count = 0;
+      // Extract each line (header) until ".\n" (getline does so automatically)
+      while (getline(receivedData, line)) 
+      {
+          if (line == ".") 
+          {
+            break;
+          }
+
+          //  If count is equal to 4, save the message into one index
+          if(count == 4)
+          {
+            continue;
+          }
+           // Add each line as a header
+          body.push_back(line);
+          count++;
+      }
+      
+      body.push_back(receivedData.str());
+      return body;
+    }
+
     void commandHandler(int clientSocket, vector<string> body)
     {
       string command = body[0];
@@ -164,71 +219,63 @@ class Server
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
-    void sendHandler(int clientSocket, vector<string> body)
+    bool sendHandler(int clientSocket, vector<string> body)
     {
-      string sender = body[0];
+      if(!createMailSpool())
+      {
+        return false;
+      }
+      string sender = "if23b281";
       string receiver = body[1];
       string subject = body[2];
+      string message = body[3];
+
+
+
     }
 
+    /*
+    LIST\n 
+    <Username>\n
+    */
     void listHandler(int clientSocket, vector<string> body)
     {
-      string username = body[0];
+      string username = body[1];
 
     }
 
+    /*
+    READ\n 
+    <Username>\n 
+    <Message-Number>\n 
+    */
     void readHandler(int clientSocket, vector<string> body)
     {
       
     }
 
+    /*
+    DEL\n 
+    <Username>\n 
+    <Message-Number>\n 
+    */
     void delHandler(int clientSocket, vector<string> body)
     {
       
     }
 
-    vector<string> parser(int clientSocket)
+    bool createMailSpool()
     {
-      vector<string> headers;
-      //  Buffer reads the data, bytesRead determines the actual number of bytes read
-      char buffer[BUFFER_SIZE];
-      ssize_t bytesRead = 0;
-      stringstream receivedData;
-
-      //  Read the data and save it into the receivedData string
-      while(receivedData.str().find(".\n") == string::npos)
-      {
-        //  Clear the buffer and read up to buffer_size - 1 bytes
-        memset(buffer, 0, BUFFER_SIZE);
-        //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
-        bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
-        
-        if (bytesRead <= 0) 
-        {
-            cerr << "Error while reading message body." << endl;
-            close(clientSocket);
-            headers.clear();
-            return headers;
-        }
-
-        buffer[bytesRead] = '\0';
-        receivedData << buffer;
-      }
       
-      // Split by newline
-      string line;
-      // Extract each line (header) until ".\n" (getline does so automatically)
-      while (getline(receivedData, line)) 
+      ofstream mailSpool(this->mailSpoolDir + ".txt");
+      if(!mailSpool)
       {
-          if (line == ".") 
-          {
-            break;  // Stop at end of headers
-          }
-
-          headers.push_back(line);  // Add each line as a header
+        cerr << "An error occured while trying to create Mail-Spool: " << this->mailSpoolDir << endl;
+        return false;
       }
 
-      return headers;
+      mailSpool.close();
+      return true;
     }
 
     string sendResponse(bool state)
@@ -236,14 +283,15 @@ class Server
       return state ? "OK\n" : "ERR\n";
     }
 
-    void printUsage()
-    {
-      cout << "** SERVER USAGE **" << endl;
-      cout << "./server <port> <mail-spool-directoryname>" << endl;
-      cout << "<port>: must be a NUMBER" << endl;
-      cout << "<mail-spool-directoryname>: must be a PATH" << endl;
-    }
 };
+
+void printUsage()
+{
+  cout << "** SERVER USAGE **" << endl;
+  cout << "./server <port> <mail-spool-directoryname>" << endl;
+  cout << "<port>: must be a NUMBER" << endl;
+  cout << "<mail-spool-directoryname>: must be a PATH" << endl;
+}
 
 int main(int argc, char *argv[])
 {
@@ -251,6 +299,7 @@ int main(int argc, char *argv[])
   if(argc != 3)
   {
     cerr << "Invalid Input!" << endl;
+    printUsage();
     return EXIT_FAILURE;
   }
  
