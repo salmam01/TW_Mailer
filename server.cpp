@@ -114,7 +114,7 @@ class Server
         return true;
     }
 
-    void clientHandler(int clientSocket)
+    bool clientHandler(int clientSocket)
     {
       //  Buffer reads the data, bytesRead determines the actual number of bytes read
       char buffer[BUFFER_SIZE];
@@ -132,7 +132,7 @@ class Server
             cerr << "Error while reading data." << endl;
             sendResponse(false);
             close(clientSocket);
-            return;
+            return false;
           }
 
           command += buffer;
@@ -144,6 +144,7 @@ class Server
           }
       }
       commandHandler(clientSocket, command);
+      return true;
     }
 
     void commandHandler(int clientSocket, string command)
@@ -222,7 +223,7 @@ class Server
       while(headers.size() < headerAmount)
       {   
           //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
-          bytesRead = recv(bytesRead, buffer, BUFFER_SIZE - 1, 0);
+          bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);  // fixed it
           //  Error occured while reading data
           if(bytesRead <= 0)
           {
@@ -243,7 +244,20 @@ class Server
 
     string parseBody(int clientSocket)
     {
-
+      string message;
+      char buffer[BUFFER_SIZE];
+      ssize_t bytesRead;
+      do {
+          memset(buffer, 0, BUFFER_SIZE);
+          bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+          if (bytesRead < 0) {
+              cerr << "Error while reading message body." << endl;
+              close(clientSocket);
+              return "";
+          }
+          message += buffer;
+      } while (message.find(".\n") == string::npos);
+      return message;
     }
 
     string sendResponse(bool state)
