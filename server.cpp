@@ -186,7 +186,7 @@ class Server
     */
     void sendHandler(int clientSocket)
     {
-      vector<string> headers = parseHeader(clientSocket, 3);
+      vector<string> headers = parser(clientSocket);
       string sender = headers[0];
       string receiver = headers[1];
       string subject = headers[2];
@@ -194,70 +194,63 @@ class Server
 
     void listHandler(int clientSocket)
     {
-      vector<string> headers = parseHeader(clientSocket, 1);
+      vector<string> headers = parser(clientSocket);
       string username = headers[0];
 
     }
 
     void readHandler(int clientSocket)
     {
-      parseHeader(clientSocket, 2);
+      parser(clientSocket);
     }
 
     void delHandler(int clientSocket)
     {
-      parseHeader(clientSocket, 2);
+      parser(clientSocket);
     }
 
-    vector<string> parseHeader(int clientSocket, int headerAmount)
+    vector<string> parser(int clientSocket)
     {
       vector<string> headers;
-
       //  Buffer reads the data, bytesRead determines the actual number of bytes read
       char buffer[BUFFER_SIZE];
-      //  Clear the buffer and read up to buffer_size - 1 bytes
-      memset(buffer, 0, BUFFER_SIZE);
       ssize_t bytesRead = 0;
-      string receivedData;
+      stringstream receivedData;
 
-      while(headers.size() < headerAmount)
-      {   
-          //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
-          bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);  // fixed it
-          //  Error occured while reading data
-          if(bytesRead <= 0)
-          {
-            cerr << "Error while reading data." << endl;
-            close(clientSocket);
-            return headers;
-          }
-
-          receivedData = buffer;
-      }
-
-      while(!receivedData.find("."))
+      //  Read the data and save it into the receivedData string
+      while(receivedData.str().find(".\n") == string::npos)
       {
+        //  Clear the buffer and read up to buffer_size - 1 bytes
+        memset(buffer, 0, BUFFER_SIZE);
+        //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
+        bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
         
-      }
-      return headers;
-    }
+        if (bytesRead <= 0) 
+        {
+            cerr << "Error while reading message body." << endl;
+            close(clientSocket);
+            headers.clear();
+            return headers;
+        }
 
-    string parseBody(int clientSocket) //code from chatty, look over it
-    {
-      string message;
-      char buffer[BUFFER_SIZE];
-      ssize_t bytesRead;
-      do {
-          memset(buffer, 0, BUFFER_SIZE);
-          bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
-          if (bytesRead < 0) {
-              cerr << "Error while reading message body." << endl;
-              close(clientSocket);
-              return "";
+        buffer[bytesRead] = '\0';
+        receivedData << buffer;
+      }
+      
+      // Split by newline
+      string line;
+      // Extract each line (header) until ".\n" (getline does so automatically)
+      while (getline(receivedData, line)) 
+      {
+          if (line == ".") 
+          {
+            break;  // Stop at end of headers
           }
-          message += buffer;
-      } while (message.find(".\n") == string::npos);
-      return message;
+
+          headers.push_back(line);  // Add each line as a header
+      }
+
+      return headers;
     }
 
     string sendResponse(bool state)
@@ -269,8 +262,8 @@ class Server
     {
       cout << "** SERVER USAGE **" << endl;
       cout << "./server <port> <mail-spool-directoryname>" << endl;
-      cout << "<port>: must be INT value" << endl;
-      cout << "<mail-spool-directoryname>: must be PATH value" << endl;
+      cout << "<port>: must be a NUMBER" << endl;
+      cout << "<mail-spool-directoryname>: must be a PATH" << endl;
     }
 };
 
