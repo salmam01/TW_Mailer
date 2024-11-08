@@ -214,18 +214,33 @@ class Server
         cerr << "Invalid command syntax." << endl;
         return false;
       }
-      
-      if(!createMailSpool())
-      {
-        return false;
-      }
 
       //  get the actual sender at some point, this just for testing
       string sender = "if23b281";
       string receiver = body[0];
       string subject = body[1];
       string message = body[2];
-      
+
+      fstream fout;
+      string mailSpoolName = sender + ".csv";
+
+      //  Open or create a new file with the name
+      fout.open(mailSpoolName, ios::out | ios::app);
+      //  Check if the file was opened successfully
+      if(!fout.is_open())
+      {
+        cerr << "Error occurred while opening Mail-Spool file." << endl;
+        return false;
+      }
+
+      fout  << receiver << ";"
+            << subject << ";"
+            << '"' 
+            << message 
+            << '"'
+            << "\n"; 
+
+      fout.close();
       return true;
     }
 
@@ -293,9 +308,10 @@ class Server
 
     }
 
-    bool createMailSpool()
+    //  Not even sure what this is for atp??
+    /*bool createMailSpool(string username)
     {
-      ofstream mailSpool(this->mailSpoolDir + ".txt");
+      ofstream mailSpool(username + ".txt");
       if(!mailSpool)
       {
         cerr << "An error occured while trying to create Mail-Spool: " << this->mailSpoolDir << endl;
@@ -304,7 +320,7 @@ class Server
 
       mailSpool.close();
       return true;
-    }
+    }*/
 
     string sendResponse(bool state)
     {
