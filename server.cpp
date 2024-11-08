@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <vector>
+#include <ldap.h>
 
 #define BUFFER_SIZE 1024
 
