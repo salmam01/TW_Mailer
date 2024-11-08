@@ -306,7 +306,7 @@ class Server
       if(!fin.is_open())
       {
         sendResponse(clientSocket, false);
-        cerr << "File does not exist" << endl;
+        cerr << "File does not exist." << endl;
         return;
       }
 
@@ -326,7 +326,7 @@ class Server
       }
       fin.close();
       
-      string response = "Message Count" + to_string(subjects.size()) + "\n";
+      string response = "Message Count: " + to_string(subjects.size()) + "\n";
 
       for(int i = 0; i < subjects.size(); i++)
       {
@@ -340,9 +340,63 @@ class Server
     READ\n 
     <Message-Number>\n 
     */
+    //  Could be improved further, same as one above
     void readHandler(int clientSocket)
     {
-      string messageNr = parser(clientSocket);
+      int messageNr;
+      try
+      {
+        messageNr = stoi(parser(clientSocket));
+      }
+      catch(const exception& e)
+      {
+        sendResponse(clientSocket, false);
+        cerr << "Message number has to be of integer type." << endl;
+        return;
+      }
+
+      string sender = "if23b281";
+      fstream fin;
+      string mailSpoolName = sender + ".csv";
+
+      fin.open(mailSpoolName, ios::in);
+      if(!fin.is_open())
+      {
+        sendResponse(clientSocket, false);
+        cerr << "File does not exist." << endl;
+        return;
+      }
+
+      string line;
+      string response;
+      int count = 1;
+      while(getline(fin, line))
+      {
+        stringstream ss(line);
+        string receiver, subject, message;
+
+        getline(ss, receiver, ';');
+        getline(ss, subject, ';');
+        getline(ss, message);
+
+        if(count == messageNr)
+        {
+          response = message; 
+          break;
+        }
+        count++;
+      }
+      fin.close();
+
+      if(response.empty())
+      {
+        sendResponse(clientSocket, false);
+        cerr << "Message does not exist." << endl;
+      }
+      else
+      {
+        send(clientSocket, response.c_str(), response.size(), 0);
+      }
     }
 
     /*
