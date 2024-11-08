@@ -114,7 +114,7 @@ class Server
         //t.detach();
         clientHandler(clientSocket);
       }
-        return true;
+      return true;
     }
 
     bool clientHandler(int clientSocket)
@@ -211,6 +211,7 @@ class Server
       vector<string> body = sendParser(clientSocket);
       if(body.empty() || body.size() < 3)
       {
+        sendResponse(clientSocket, false);
         cerr << "Invalid command syntax." << endl;
         return false;
       }
@@ -232,7 +233,7 @@ class Server
         cerr << "Error occurred while opening Mail-Spool file." << endl;
         return false;
       }
-
+      
       fout  << receiver << ";"
             << subject << ";"
             << '"' 
@@ -240,7 +241,17 @@ class Server
             << '"'
             << "\n"; 
 
+      if(fout.fail())
+      {
+        fout.close();
+        cerr << "Error writing to Mail-Spool file." << endl;
+        sendResponse(clientSocket, false);
+        return false;
+      }
+
       fout.close();
+
+      sendResponse(clientSocket, true);
       return true;
     }
 
@@ -283,10 +294,46 @@ class Server
     /*
     LIST\n 
     */
+    //  this function should list everything inside the csv file for the specified user
     void listHandler(int clientSocket)
     {
-      //  this function should list everything inside the csv file for the specified user
+      //  temporary
+      string sender = "if23b281";
+      fstream fin;
+      string mailSpoolName = sender + ".csv";
 
+      fin.open(mailSpoolName, ios::in);
+      if(!fin.is_open())
+      {
+        sendResponse(clientSocket, false);
+        cerr << "File does not exist" << endl;
+        return;
+      }
+
+      string line;
+      vector<string> subjects;
+      //  Loop until the end of the file
+      while(getline(fin, line))
+      {
+        stringstream ss(line);
+        string receiver, subject, message;
+
+        getline(ss, receiver, ';');
+        getline(ss, subject, ';');
+        getline(ss, message);
+
+        subjects.push_back(subject);
+      }
+      fin.close();
+      
+      string response = "Message Count" + to_string(subjects.size()) + "\n";
+
+      for(int i = 0; i < subjects.size(); i++)
+      {
+        response += subjects[i] + "\n";
+      }
+
+      send(clientSocket, response.c_str(), response.size(), 0);
     }
 
     /*
@@ -322,9 +369,16 @@ class Server
       return true;
     }*/
 
-    string sendResponse(bool state)
+    void sendResponse(int clientSocket, bool state)
     {
-      return state ? "OK\n" : "ERR\n";
+      if(state)
+      {
+        send(clientSocket, "OK\n", 3, 0);
+      }
+      else
+      {
+        send(clientSocket, "ERR\n", 4, 0);
+      }
     }
 
 };

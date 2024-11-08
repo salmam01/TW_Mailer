@@ -47,6 +47,7 @@
         "cstring": "cpp",
         "xstring": "cpp",
         "xiosbase": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "xutility": "cpp"
     }
 }
