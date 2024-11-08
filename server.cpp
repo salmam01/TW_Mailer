@@ -162,7 +162,11 @@ class Server
 
     void commandHandler(int clientSocket, string command)
     {
-      if(command == "SEND")
+      if(command == "LOGIN")
+      {
+        loginHandler(clientSocket);
+      }
+      else if(command == "SEND")
       {
         sendHandler(clientSocket);
       }
@@ -189,18 +193,23 @@ class Server
       }
     }
 
+    bool loginHandler(int clientSocket)
+    {
+
+    }
+
     /*
     SEND\n 
-    <Sender>\n 
     <Receiver>\n 
     <Subject (max. 80 chars)>\n 
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
+    //  Ignore the fact that this is a bool for now, it will come in handy later
     bool sendHandler(int clientSocket)
     {
       vector<string> body = sendParser(clientSocket);
-      if(body.empty())
+      if(body.empty() || body.size() < 3)
       {
         cerr << "Invalid command syntax." << endl;
         return false;
@@ -252,42 +261,40 @@ class Server
           body[3] += line + "\n";
         }
       }
+      
       return body;
     }
 
     /*
     LIST\n 
-    <Username>\n
     */
     void listHandler(int clientSocket)
     {
-      //string username = body[1];
+      //  this function should list everything inside the csv file for the specified user
 
     }
 
     /*
     READ\n 
-    <Username>\n 
     <Message-Number>\n 
     */
     void readHandler(int clientSocket)
     {
-      
+      string messageNr = parser(clientSocket);
     }
 
     /*
     DEL\n 
-    <Username>\n 
     <Message-Number>\n 
     */
     void delHandler(int clientSocket)
     {
-      
+      string messageNr = parser(clientSocket);
+
     }
 
     bool createMailSpool()
     {
-      
       ofstream mailSpool(this->mailSpoolDir + ".txt");
       if(!mailSpool)
       {
