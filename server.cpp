@@ -136,7 +136,7 @@ class Server
       //  Buffer reads the data, bytesRead determines the actual number of bytes read
       char buffer[BUFFER_SIZE];
       ssize_t bytesRead = 0;
-      string command;
+      string line;
 
       //  Read the data and save it into the receivedData string
       while(receivedData.str().find("\n") == string::npos)
@@ -154,10 +154,10 @@ class Server
         }
 
         buffer[bytesRead] = '\0';
-        command += buffer;
+        line += buffer;
       }
 
-      return command;
+      return line;
     }
 
     void commandHandler(int clientSocket, string command)
@@ -211,41 +211,48 @@ class Server
         return false;
       }
 
+      //  get the actual sender at some point, this just for testing
       string sender = "if23b281";
-      string receiver = body[1];
-      string subject = body[2];
-      string message = body[3];
+      string receiver = body[0];
+      string subject = body[1];
+      string message = body[2];
       
       return true;
     }
 
-    //  Ignore pls, still a work in progress
+    //  ??? hopefully this shit works now
     vector<string> sendParser(int clientSocket)
     {
+      vector<string> body;
       string line;
-      int count;
 
-      while(getline())
+      while(1)
       {
+        //  Use the parser function to extract each line
+        line = parser(clientSocket);
+
         if (line == ".") 
         {
           break;
         }
 
-        string message;
-        //  If count is greater than 4, save the message into one index
-        if(count < 4)
+        if(body.size() < 3)
         {
-          // Add each line as a header
+          // Save receiver, subject
           body.push_back(line);
         }
+        //  If body size is greater than 3, save the message into one index
         else
         {
-          message << line << "\n";
+          //  Initialize the vector index, then append the message lines
+          if(body.size() == 3)
+          {
+            body.push_back("");
+          }
+          body[3] += line + "\n";
         }
-
-        count++;
       }
+      return body;
     }
 
     /*
