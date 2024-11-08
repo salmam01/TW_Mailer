@@ -205,6 +205,7 @@ class Server
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
+    // -------------------------------------->MISSING PATH SPECIFICATION FOR ALL HANDLER FUNCTIONS<-----------------------------------------------
     //  Ignore the fact that this is a bool for now, it will come in handy later
     bool sendHandler(int clientSocket)
     {
@@ -230,6 +231,7 @@ class Server
       //  Check if the file was opened successfully
       if(!fout.is_open())
       {
+        sendResponse(clientSocket, false);
         cerr << "Error occurred while opening Mail-Spool file." << endl;
         return false;
       }
@@ -254,7 +256,7 @@ class Server
       sendResponse(clientSocket, true);
       return true;
     }
-
+    
     //  ??? hopefully this shit works now
     vector<string> sendParser(int clientSocket)
     {
@@ -403,10 +405,95 @@ class Server
     DEL\n 
     <Message-Number>\n 
     */
+    // Copy the file contents without the specified line into a temporary file and replace the original file
     void delHandler(int clientSocket)
     {
-      string messageNr = parser(clientSocket);
+      string sender = "if23b281";
+      int messageNr;
+      try
+      {
+        messageNr = stoi(parser(clientSocket));
+      }
+      catch(const exception& e)
+      {
+        sendResponse(clientSocket, false);
+        cerr << "Message number has to be of integer type." << endl;
+        return;
+      }
 
+      fstream fin;
+      fstream tempFile;
+      //  Should probably save the name somewhere atp...
+      string mailSpoolName = sender + ".csv";
+      string tempFileName = sender + "Temp.csv";
+
+      fstream fin(mailSpoolName, ios::in);
+      if(!fin.is_open())
+      {
+        sendResponse(clientSocket, false);
+        cerr << "File does not exist." << endl;
+        return;
+      }
+
+      fstream tempFile(tempFileName, ios::out);
+      if(!tempFileName.is_open())
+      {
+        sendResponse(clientSocket, false);
+        cerr << "Error while opening temporary file for writing." << endl;
+        fin.close();
+        return;
+      }
+
+      string line;
+      int count = 1;
+      bool fileFound = false;
+
+      while(getline(fin, line))
+      {
+        //  Skip the line if it's found 
+        if(count == messageNr)
+        {
+          fileFound = true;
+        }
+        //  Write all other lines into the temporary file
+        else
+        {
+          tempFile << line << "\n";
+        }
+        count++;
+      }
+
+      fin.close();
+      tempFile.close();
+
+      if(fileFound)
+      {
+        if (remove(mailSpoolName.c_str()) != 0 || rename(tempFileName.c_str(), mailSpoolName.c_str()) != 0) {
+            sendResponse(clientSocket, false);
+            cerr << "Error updating the mail file." << endl;
+            return;
+        }
+        sendResponse(clientSocket, true);
+      }
+      else
+      {
+        remove(tempFileName.c_str());
+        sendResponse(clientSocket, false);
+        cerr << "Message number not found." << endl;
+      }
+    }
+
+    //  Function that handles simple responses to the client
+    void sendResponse(int clientSocket, bool state)
+    {
+      if(state)
+      {
+        send(clientSocket, "OK\n", 3, 0);
+      }
+      else
+      {
+        send(clientSocket, "ERR\n", 4, 0);
+      }
     }
 
     //  Not even sure what this is for atp??
@@ -422,18 +509,6 @@ class Server
       mailSpool.close();
       return true;
     }*/
-
-    void sendResponse(int clientSocket, bool state)
-    {
-      if(state)
-      {
-        send(clientSocket, "OK\n", 3, 0);
-      }
-      else
-      {
-        send(clientSocket, "ERR\n", 4, 0);
-      }
-    }
 
 };
 
