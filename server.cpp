@@ -119,25 +119,27 @@ class Server
 
     bool clientHandler(int clientSocket)
     {
-      vector<string> body = parser(clientSocket);
-      if(body.empty())
+      string command = parser(clientSocket);
+      if(command.empty())
       {
+        cerr << "Command cannot be empty." << endl;
         return false;
       }
-      commandHandler(clientSocket, body);
+
+      //  Pass the command to the commandHandler if it's not empty
+      commandHandler(clientSocket, command);
       return true;
     }
 
-    vector<string> parser(int clientSocket)
+    string parser(int clientSocket)
     {
-      vector<string> body;
       //  Buffer reads the data, bytesRead determines the actual number of bytes read
       char buffer[BUFFER_SIZE];
       ssize_t bytesRead = 0;
-      stringstream receivedData;
+      string command;
 
       //  Read the data and save it into the receivedData string
-      while(receivedData.str().find(".\n") == string::npos)
+      while(receivedData.str().find("\n") == string::npos)
       {
         //  Clear the buffer and read up to buffer_size - 1 bytes
         memset(buffer, 0, BUFFER_SIZE);
@@ -148,64 +150,33 @@ class Server
         {
             cerr << "Error while reading message body." << endl;
             close(clientSocket);
-            body.clear();
-            return body;
+            return "";
         }
 
         buffer[bytesRead] = '\0';
-        receivedData << buffer;
+        command += buffer;
       }
-      
-      // Split by newline
-      string line;
-      int count = 0;
-      stringstream message;
 
-      // Extract each line (header) until ".\n" (getline does so automatically)
-      while (getline(receivedData, line)) 
-      {
-          if (line == ".") 
-          {
-            break;
-          }
-
-          //  If count is equal to 4, save the message into one index
-          if(count < 4)
-          {
-            // Add each line as a header
-            body.push_back(line);
-          }
-          else
-          {
-            message << line << "\n";
-          }
-
-          count++;
-      }
-      
-      body.push_back(message.str());
-      return body;
+      return command;
     }
 
-    void commandHandler(int clientSocket, vector<string> body)
+    void commandHandler(int clientSocket, string command)
     {
-      string command = body[0];
-
       if(command == "SEND")
       {
-        sendHandler(clientSocket, body);
+        sendHandler(clientSocket);
       }
       else if(command == "LIST")
       {
-        listHandler(clientSocket, body);
+        listHandler(clientSocket);
       }
       else if(command == "READ")
       {
-        readHandler(clientSocket, body);
+        readHandler(clientSocket);
       }
       else if(command == "DEL")
       {
-        delHandler(clientSocket, body);
+        delHandler(clientSocket);
       }
       else if(command == "QUIT")
       {
@@ -226,28 +197,64 @@ class Server
     <message (multi-line; no length restrictions)\n> 
     .\n  
     */
-    bool sendHandler(int clientSocket, vector<string> body)
+    bool sendHandler(int clientSocket)
     {
+      vector<string> body = sendParser(clientSocket);
+      if(body.empty())
+      {
+        cerr << "Invalid command syntax." << endl;
+        return false;
+      }
+      
       if(!createMailSpool())
       {
         return false;
       }
+
       string sender = "if23b281";
       string receiver = body[1];
       string subject = body[2];
       string message = body[3];
+      
+      return true;
+    }
 
+    //  Ignore pls, still a work in progress
+    vector<string> sendParser(int clientSocket)
+    {
+      string line;
+      int count;
 
+      while(getline())
+      {
+        if (line == ".") 
+        {
+          break;
+        }
 
+        string message;
+        //  If count is greater than 4, save the message into one index
+        if(count < 4)
+        {
+          // Add each line as a header
+          body.push_back(line);
+        }
+        else
+        {
+          message << line << "\n";
+        }
+
+        count++;
+      }
     }
 
     /*
     LIST\n 
     <Username>\n
     */
-    void listHandler(int clientSocket, vector<string> body)
+    void listHandler(int clientSocket)
     {
-      string username = body[1];
+      //string username = body[1];
 
     }
 
@@ -256,7 +263,7 @@ class Server
     <Username>\n 
     <Message-Number>\n 
     */
-    void readHandler(int clientSocket, vector<string> body)
+    void readHandler(int clientSocket)
     {
       
     }
@@ -266,7 +273,7 @@ class Server
     <Username>\n 
     <Message-Number>\n 
     */
-    void delHandler(int clientSocket, vector<string> body)
+    void delHandler(int clientSocket)
     {
       
     }
