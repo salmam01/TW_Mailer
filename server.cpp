@@ -159,6 +159,8 @@ class Server
       // Split by newline
       string line;
       int count = 0;
+      stringstream message;
+
       // Extract each line (header) until ".\n" (getline does so automatically)
       while (getline(receivedData, line)) 
       {
@@ -168,16 +170,20 @@ class Server
           }
 
           //  If count is equal to 4, save the message into one index
-          if(count == 4)
+          if(count < 4)
           {
-            continue;
+            // Add each line as a header
+            body.push_back(line);
           }
-           // Add each line as a header
-          body.push_back(line);
+          else
+          {
+            message << line << "\n";
+          }
+
           count++;
       }
       
-      body.push_back(receivedData.str());
+      body.push_back(message.str());
       return body;
     }
 
