@@ -12,7 +12,7 @@
 #include <ldap.h>
 
 #define BUFFER_SIZE 1024
-#define MAIL_SPOOL_DIR "/mail_spool"
+#define MAIL_SPOOL_DIR "/mail_spool" // <- ???
 
 using namespace std;
 using namespace std::filesystem;
@@ -25,6 +25,11 @@ class Server
     int serverSocket = -1;
     int reuseValue = 1;
     int abortRequested = 0;
+    const int maxLoginAttempts = 3;
+    int loginAttempts = 0;
+    string currentUser ="";
+    const char *ldapServer = "ldap://ldap.technikum-wien.at:389";
+    const char *ldapBind = "ou=people,dc=technikum-wien,dc=at";
 
   public:
     Server(int port, string mailSpoolDir)
@@ -103,10 +108,14 @@ class Server
       {
         cout << "Listening for client connections..." << endl;
         int clientSocket = accept(serverSocket, nullptr, nullptr);
-        if (clientSocket < 0) 
+        if (clientSocket >= 0) 
         {
-          cerr << "Error accepting client connection." << endl;
-          return false;
+            cout << "Client accepted" << endl;
+        }
+        else 
+        {
+            cerr << "Error accepting client connection." << endl;
+            return false;
         }
 
         //  Need to look into threads for concurrent server
@@ -119,6 +128,14 @@ class Server
 
     bool clientHandler(int clientSocket)
     {
+      const char* welcomeMessage = "Welcome to myserver! Please login with LOGIN.\n";
+      if (send(clientSocket, welcomeMessage, strlen(welcomeMessage), 0) == -1)
+      {
+        perror("send failed");
+        close(clientSocket);  // Close the socket on failure
+        return false;
+      }
+
       string command = parser(clientSocket);
       if(command.empty())
       {
@@ -133,70 +150,137 @@ class Server
 
     string parser(int clientSocket)
     {
-      //  Buffer reads the data, bytesRead determines the actual number of bytes read
-      char buffer[BUFFER_SIZE];
-      ssize_t bytesRead = 0;
-      string line;
+        // Buffer reads the data, bytesRead determines the actual number of bytes read
+        char buffer[BUFFER_SIZE];
+        ssize_t bytesRead = 0;
+        string line;
 
-      //  Read the data and save it into the receivedData string
-      while(receivedData.str().find("\n") == string::npos)
-      {
-        //  Clear the buffer and read up to buffer_size - 1 bytes
-        memset(buffer, 0, BUFFER_SIZE);
-        //  recv reads the data from clientSocket and stores it into buffer (up to buffer_size -1)
-        bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
-        
-        if (bytesRead <= 0) 
+        // Read the data and save it into the receivedData string
+        while (true)
         {
-            cerr << "Error while reading message body." << endl;
-            close(clientSocket);
-            return "";
+            // Clear the buffer and read up to buffer_size - 1 bytes
+            memset(buffer, 0, BUFFER_SIZE);
+            bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+
+            if (bytesRead <= 0)
+            {
+                cerr << "Error while reading message body." << endl;
+                close(clientSocket);
+                return "";
+            }
+
+            buffer[bytesRead] = '\0'; // Null terminate the buffer
+            line += buffer; // Append buffer content to the line
+
+            // Debug output
+            cout << "Received client input: " << buffer << endl;
+
+            // If a newline character is found, we have the full line
+            if (line.find("\n") != string::npos)
+            {
+                break;
+            }
         }
 
-        buffer[bytesRead] = '\0';
-        line += buffer;
-      }
+        // Strip the newline character at the end, if present
+        size_t pos = line.find("\n");
+        if (pos != string::npos)
+        {
+            line = line.substr(0, pos);  // Remove the newline
+        }
 
-      return line;
+        return line;
     }
 
     void commandHandler(int clientSocket, string command)
     {
-      if(command == "LOGIN")
-      {
-        loginHandler(clientSocket);
-      }
-      else if(command == "SEND")
-      {
-        sendHandler(clientSocket);
-      }
-      else if(command == "LIST")
-      {
-        listHandler(clientSocket);
-      }
-      else if(command == "READ")
-      {
-        readHandler(clientSocket);
-      }
-      else if(command == "DEL")
-      {
-        delHandler(clientSocket);
-      }
-      else if(command == "QUIT")
-      {
-        cout << "Closing Server..." << endl;
-        close(clientSocket);
-      }
-      else
-      {
-        cerr << "Invalid Command!" << endl;
-      }
+        cout << "Received command: " << command << endl;
+        
+        if (command == "LOGIN")
+        {
+            cout << "Handling LOGIN command" << endl;
+            if (loginHandler(clientSocket)) {
+                sendResponse(clientSocket, true);  // OK LOGIN SUCCESSFUL
+            } else {
+                sendResponse(clientSocket, false); // ERR LOGIN FAILED
+            }
+        }
+        else if (command == "SEND")
+        {
+            cout << "Handling SEND command" << endl;
+            if (sendHandler(clientSocket)) {
+                sendResponse(clientSocket, true);  // OK MESSAGE SENT
+            } else {
+                sendResponse(clientSocket, false); // ERR MESSAGE SEND FAILED
+            }
+        }
+        else if (command == "LIST")
+        {
+            cout << "Handling LIST command" << endl;
+            listHandler(clientSocket);
+        }
+        else if (command == "READ")
+        {
+            cout << "Handling READ command" << endl;
+            readHandler(clientSocket);
+        }
+        else if (command == "DEL")
+        {
+            cout << "Handling DEL command" << endl;
+            delHandler(clientSocket);
+        }
+        else if (command == "QUIT")
+        {
+            cout << "Handling QUIT command" << endl;
+            sendResponse(clientSocket, true);  // OK CONNECTION CLOSED
+            close(clientSocket);  // Close the connection after QUIT
+        }
+        else
+        {
+            // Invalid command
+            sendResponse(clientSocket, false); // ERR INVALID COMMAND
+        }
     }
 
     bool loginHandler(int clientSocket)
     {
+        char buffer[1024];
+        ssize_t bytesRead;
 
+        // Read the username sent by the client
+        memset(buffer, 0, sizeof(buffer)); // Clear the buffer
+        bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        
+        if (bytesRead <= 0)
+        {
+            cerr << "Error reading username from client." << endl;
+            return false;
+        }
+
+        // Null-terminate the string received from the client
+        buffer[bytesRead] = '\0';
+        string username(buffer);
+        cout << "User entered: " << username << endl; // Log the username
+
+        // Read the password sent by the client
+        memset(buffer, 0, sizeof(buffer)); // Clear the buffer
+        bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        
+        if (bytesRead <= 0)
+        {
+            cerr << "Error reading password from client." << endl;
+            return false;
+        }
+
+        // Null-terminate the string received from the client
+        buffer[bytesRead] = '\0';
+        string password(buffer);
+        cout << "Password entered: " << password << endl; // Log the password
+
+        // For testing
+        return true;
     }
+
 
     /*
     SEND\n 
@@ -421,8 +505,8 @@ class Server
         return;
       }
 
-      fstream fin;
-      fstream tempFile;
+      //fstream fin;
+      //fstream tempFile;
       //  Should probably save the name somewhere atp...
       string mailSpoolName = sender + ".csv";
       string tempFileName = sender + "Temp.csv";
@@ -436,7 +520,7 @@ class Server
       }
 
       fstream tempFile(tempFileName, ios::out);
-      if(!tempFileName.is_open())
+      if(!tempFile.is_open())
       {
         sendResponse(clientSocket, false);
         cerr << "Error while opening temporary file for writing." << endl;
@@ -510,6 +594,88 @@ class Server
       return true;
     }*/
 
+/*
+  int connectLdap(int client_socket)
+  {
+      LDAP *ld;
+      int ldapVersion = LDAP_VERSION3;
+      int rc = 0;
+
+      char buffer[BUFFER_SIZE];
+      string username, password;
+      
+      memset(buffer, 0, BUFFER_SIZE);
+      // Get username from client
+      recv(client_socket, buffer, sizeof(buffer), 0);
+      username = buffer;
+      memset(buffer, 0, BUFFER_SIZE);
+      // Get password from client
+      recv(client_socket, buffer, sizeof(buffer), 0);
+      password = buffer;
+
+      // Initialize LDAP connection
+      rc = ldap_initialize(&ld, ldapServer);
+      if (rc != LDAP_SUCCESS)
+      {
+          fprintf(stderr, "ldap_init failed\n");
+          return EXIT_FAILURE;
+      }
+      printf("connected to LDAP server %s\n", ldapServer);
+
+      // Set LDAP protocol version to 3.0
+      rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
+      if (rc == LDAP_SUCCESS)
+          printf("ldap_set_option succeeded - version set to 3\n");
+      else
+      {
+          printf("SetOption Error:%0X\n", rc);
+      }
+
+      // Start a secure TLS connection
+      rc = ldap_start_tls_s(ld, NULL, NULL);
+      if (rc != LDAP_SUCCESS)
+      {
+          fprintf(stderr, "ldap_start_tls_s() failed: %s\n", ldap_err2string(rc));
+          ldap_unbind_ext_s(ld, NULL, NULL);
+          return -1;
+      }
+
+      // Prepare the DN for SASL authentication
+      char dn[256];
+      sprintf(dn, "uid=%s,%s", username.c_str(), ldapBind);
+      cout << "Attempting SASL bind with DN: " << dn << endl;
+      // Perform SASL bind (using the PLAIN authentication method)
+      rc = ldap_sasl_bind_s(ld, dn, LDAP_SASL_SIMPLE, &password[0], NULL, NULL, NULL);
+      if (rc != LDAP_SUCCESS)
+      {
+          loginAttempts += 1;
+          cerr << "Authentication failed for user " << username << endl;
+          if (loginAttempts == maxLoginAttempts)
+          {
+              // Lock the account after 3 failed login attempts
+              strcpy(buffer, "Too many login attempts! You are blacklisted for 1 minute.\n");
+              if (send(client_socket, buffer, strlen(buffer), 0) == -1)
+              {
+                  perror("send failed");
+                  return -1;
+              }
+              std::this_thread::sleep_for(std::chrono::minutes(1));
+              loginAttempts = 0;
+          }
+          ldap_unbind_ext_s(ld, NULL, NULL);
+          return -1;
+      }
+
+      cout << "SASL bind as " << username << " was successful!" << endl;
+
+      // Save the current user
+      currentUser = username;
+
+      // Unbind and close the LDAP connection
+      ldap_unbind_ext_s(ld, NULL, NULL);
+      return 0;
+  }
+  */
 };
 
 void printUsage()
@@ -519,6 +685,7 @@ void printUsage()
   cout << "<port>: must be a NUMBER" << endl;
   cout << "<mail-spool-directoryname>: must be a PATH" << endl;
 }
+
 
 int main(int argc, char *argv[])
 {

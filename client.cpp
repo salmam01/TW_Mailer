@@ -8,192 +8,224 @@
 #include <string.h>
 #include <iostream>
 #include <sstream>
-#include <algorithm> //for transform
-#include <ctype.h> //for toupper
+#include <algorithm> // for transform
+#include <ctype.h>   // for toupper
 #include "client_functions.h"
-using namespace std;
-
-///////////////////////////////////////////////////////////////////////////////
 
 #define BUFFER_SIZE 1024
 
-///////////////////////////////////////////////////////////////////////////////
+using namespace std;
+
+class Client
+{
+private:
+    int socket_fd;
+    struct sockaddr_in server_address;
+    char buffer[BUFFER_SIZE];
+
+public:
+    Client(const char *ip, int port)
+    {
+        // Initialize socket
+        socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (socket_fd == -1)
+        {
+            perror("Socket error");
+            exit(EXIT_FAILURE);
+        }
+
+        // Initialize address structure
+        memset(&server_address, 0, sizeof(server_address));
+        server_address.sin_family = AF_INET;
+        server_address.sin_port = htons(port);
+        inet_aton(ip, &server_address.sin_addr);
+    }
+
+    bool connect_to_server()
+    {
+        if (connect(socket_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
+        {
+            perror("Connect error - no server available");
+            return false;
+        }
+        printf("Connection with server (%s) established\n", inet_ntoa(server_address.sin_addr));
+        return true;
+    }
+
+    void receive_data()
+    {
+        int size = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+        if (size == -1)
+        {
+            perror("recv error");
+        }
+        else if (size == 0)
+        {
+            printf("Server closed remote socket\n");
+        }
+        else
+        {
+            buffer[size] = '\0';
+            printf("%s", buffer);
+        }
+        memset(buffer, 0, BUFFER_SIZE);
+    }
+
+    bool send_command(const string &command)
+    {
+        if (send(socket_fd, command.c_str(), command.length(), 0) == -1)
+        {
+            perror("send error");
+            return false;
+        }
+        return true;
+    }
+
+    void close_connection()
+    {
+        if (socket_fd != -1)
+        {
+            if (shutdown(socket_fd, SHUT_RDWR) == -1)
+            {
+                perror("shutdown socket");
+            }
+            if (close(socket_fd) == -1)
+            {
+                perror("close socket");
+            }
+            socket_fd = -1;
+        }
+    }
+
+    int get_socket_fd() const
+    {
+        return socket_fd;
+    }
+
+    char *get_buffer()
+    {
+        return buffer;
+    }
+};
 
 int main(int argc, char **argv)
 {
-   int create_socket;
-   char buffer[BUFFER_SIZE];
-   struct sockaddr_in address;
-   int size;
-   int isQuit = 0;
+    if (argc != 3)
+    {
+        cerr << "Usage: ./client <ip> <port>\n";
+        return EXIT_FAILURE;
+    }
 
-   if(argc != 3){
-      cerr << "Usage: ./client <ip> <port>\n";
-      return EXIT_FAILURE;
-   }
+    // Parse port argument
+    int port;
+    istringstream iss(argv[2]);
+    if (!(iss >> port))
+    {
+        cerr << "Invalid port - not a number\n";
+        return EXIT_FAILURE;
+    }
 
-   std::istringstream iss(argv[2]);
-   int port;
-   if(!(iss >> port)){
-      cerr << "Invalid port - not a number\n";
-      return EXIT_FAILURE;
-   }
-   ////////////////////////////////////////////////////////////////////////////
-   // CREATE A SOCKET
-   // https://man7.org/linux/man-pages/man2/socket.2.html
-   // https://man7.org/linux/man-pages/man7/ip.7.html
-   // https://man7.org/linux/man-pages/man7/tcp.7.html
-   // IPv4, TCP (connection oriented), IP (same as server)
-   if ((create_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-   {
-      perror("Socket error");
-      return EXIT_FAILURE;
-   }
+    Client client(argv[1], port);
 
-   ////////////////////////////////////////////////////////////////////////////
-   // INIT ADDRESS
-   // Attention: network byte order => big endian
-   memset(&address, 0, sizeof(address)); // init storage with 0
-   address.sin_family = AF_INET;         // IPv4
-   // https://man7.org/linux/man-pages/man3/htons.3.html
-   address.sin_port = htons(port);
-   inet_aton(argv[1], &address.sin_addr); //127.0.0.1 for now
-   // https://man7.org/linux/man-pages/man3/inet_aton.3.html
+    if (!client.connect_to_server())
+    {
+        return EXIT_FAILURE;
+    }
 
-   ////////////////////////////////////////////////////////////////////////////
-   // CREATE A CONNECTION
-   // https://man7.org/linux/man-pages/man2/connect.2.html
-   if (connect(create_socket,
-               (struct sockaddr *)&address,
-               sizeof(address)) == -1)
-   {
-      // https://man7.org/linux/man-pages/man3/perror.3.html
-      perror("Connect error - no server available");
-      return EXIT_FAILURE;
-   }
+    client.receive_data();
 
-   // ignore return value of printf
-   printf("Connection with server (%s) established\n",
-          inet_ntoa(address.sin_addr));
+    bool isQuit = false;
+    do
+    {
+        printf(">> ");
+        string command;
+        getline(cin, command);
+        transform(command.begin(), command.end(), command.begin(), ::toupper);
 
-   ////////////////////////////////////////////////////////////////////////////
-   // RECEIVE DATA
-   // https://man7.org/linux/man-pages/man2/recv.2.html
-   size = recv(create_socket, buffer, BUFFER_SIZE - 1, 0);
-   if (size == -1)
-   {
-      perror("recv error");
-   }
-   else if (size == 0)
-   {
-      printf("Server closed remote socket\n"); // ignore error
-   }
-   else
-   {
-      buffer[size] = '\0';
-      printf("%s", buffer); // ignore error
-   }
-   memset(buffer, 0, BUFFER_SIZE);
-
-   do
-   {
-      printf(">> ");
-      string command;
-      getline(cin, command);
-      transform(command.begin(), command.end(), command.begin(), ::toupper);
-      if(command=="SEND"){
-        if(sendCommand(create_socket) == -1){
+        if (command == "SEND")
+        {
+            if (sendCommand(client.get_socket_fd()) == -1)
+            {
+                continue;
+            }
+        }
+        else if (command == "LIST")
+        {
+            if (listCommand(client.get_socket_fd()) == -1)
+            {
+                continue;
+            }
+        }
+        else if (command == "READ")
+        {
+            if (readCommand(client.get_socket_fd()) == -1)
+            {
+                continue;
+            }
+        }
+        else if (command == "DEL")
+        {
+            if (delCommand(client.get_socket_fd()) == -1)
+            {
+                continue;
+            }
+        }
+        else if (command == "LOGIN")
+        {
+            if (loginCommand(client.get_socket_fd()) == -1)
+            {
+                continue;
+            }
+        }
+        else if (command == "QUIT")
+        {
+            isQuit = true;
+            if (!client.send_command("QUIT"))
+            {
+                continue;
+            }
+        }
+        else
+        {
+            cout << "No valid command!" << endl;
             continue;
         }
-      }
-      else if(command=="LIST"){
-         if(listCommand(create_socket) == -1){
-            continue;
+
+        if (!isQuit)
+        {
+            while (true)
+            {
+                int size = recv(client.get_socket_fd(), client.get_buffer(), BUFFER_SIZE - 1, 0);
+                if (size == -1)
+                {
+                    perror("recv error");
+                    break;
+                }
+                else if (size == 0)
+                {
+                    printf("Server closed remote socket\n");
+                    break;
+                }
+                else
+                {
+                    client.get_buffer()[size] = '\0';
+                    printf("%s\n", client.get_buffer());
+
+                    // Check for specific responses
+                    if (strstr(client.get_buffer(), "<< OK") ||
+                        strstr(client.get_buffer(), "<< ERR") ||
+                        strstr(client.get_buffer(), "<< LOGIN FIRST"))
+                    {
+                        memset(client.get_buffer(), 0, BUFFER_SIZE);
+                        break;
+                    }
+                }
+            }
         }
-      }
-      else if(command=="READ"){
-         if(readCommand(create_socket) == -1){
-            continue;
-        }
-      }
-      else if(command=="DEL"){
-         if(delCommand(create_socket) == -1){
-            continue;
-        }
-      }
-      else if(command=="LOGIN"){
-         if(loginCommand(create_socket) ==-1){
-            continue;
-         }
-      }
-      else if(command=="QUIT"){
-         isQuit = 1;
-         if ((send(create_socket, "QUIT", 4, 0)) == -1) 
-            {
-               perror("send error");
-               return -1;
-            }
-      } else {
-         cout << "No valid command!" << endl;
-         continue;
-      }
-         if(!isQuit){
 
-            while(true){
-               size = recv(create_socket, buffer, BUFFER_SIZE - 1, 0);
+    } while (!isQuit);
 
-            if (size == -1)
-            {
-               perror("recv error");
-               break;
-            }
-            else if (size == 0)
-            {
-               printf("Server closed remote socket\n"); // ignore error
-               break;
-            }
-            else
-            {
-               buffer[size] = '\0';
-               printf("%s\n", buffer);
+    client.close_connection();
 
-               //Buffer doesnt receive line by line: check if OK or ERR is contained anywhere in there.
-               char *output = NULL;
-               output = strstr (buffer,"<< OK");
-               if(output) {
-                  memset(buffer, 0, BUFFER_SIZE);
-                  break;
-               }
-               output = strstr (buffer,"<< ERR");
-               if(output) {
-                  memset(buffer, 0, BUFFER_SIZE);
-                  break;
-               }
-               output = strstr (buffer, "<< LOGIN FIRST");
-               if(output) {
-                  memset(buffer, 0, BUFFER_SIZE);
-                  break;
-               }
-            }
-            }
-         }
-   } while (!isQuit);
-
-   ////////////////////////////////////////////////////////////////////////////
-   // CLOSES THE DESCRIPTOR
-   if (create_socket != -1)
-   {
-      if (shutdown(create_socket, SHUT_RDWR) == -1)
-      {
-         // invalid in case the server is gone already
-         perror("shutdown create_socket"); 
-      }
-      if (close(create_socket) == -1)
-      {
-         perror("close create_socket");
-      }
-      create_socket = -1;
-   }
-
-   return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
