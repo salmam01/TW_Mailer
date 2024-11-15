@@ -1,17 +1,14 @@
 #include "serverClass.h"
+#include "serverHeaders.h"
 
-Server::Server(int port, string mailSpoolDir)
-{
-  this->port = port;
-  this->mailSpoolDir = mailSpoolDir;
-}
+Server::Server(int port, std::string mailSpoolDir): port(port),mailSpoolDir(mailSpoolDir){}
 
-Server::bool start()
+bool Server::start()
 {
   //  Create a new socket
   if((this->serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
   {
-    cerr << "Error while creating socket" << endl;
+    std::cerr << "Error while creating socket" << std::endl;
     return false;
   }
 
@@ -21,7 +18,7 @@ Server::bool start()
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
   {
-    cerr << "Set socket options - reuseAddr" << endl;
+    std::cerr << "Set socket options - reuseAddr" << std::endl;
     return false;
   }
 
@@ -31,7 +28,7 @@ Server::bool start()
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
       {
-      cerr << "Set socket options - reusePort" << endl;
+      std::cerr << "Set socket options - reusePort" << std::endl;
       return false;
   }
 
@@ -42,13 +39,13 @@ Server::bool start()
   serverAddress.sin_port = htons(this->port);
   serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-  cout << "Port: " << this->port << endl;
-  cout << "Mail-Spool Directory: " << this->mailSpoolDir << endl;
+  std::cout << "Port: " << this->port << std::endl;
+  std::cout << "Mail-Spool Directory: " << this->mailSpoolDir << std::endl;
 
   //  Binding socket
   if(bind(this->serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
   {
-    cerr << "Error while binding socket." << endl;
+    std::cerr << "Error while binding socket." << std::endl;
     close(this->serverSocket);
     return false;
   }
@@ -56,13 +53,13 @@ Server::bool start()
   //  Listen for incoming clients
   if(listen(this->serverSocket, 5) < 0)
   {
-    cerr << "Error while listening for clients." << endl;
+    std::cerr << "Error while listening for clients." << std::endl;
     close(this->serverSocket);
     return false;
   }
 
   //  Accept client
-  if(!acceptClients(this->serverSocket))
+  if(!acceptClients())
   {
     return false;
   }
@@ -70,19 +67,19 @@ Server::bool start()
   return true;
 }
 
-Server::bool acceptClients()
+bool Server::acceptClients()
 {
   while(!abortRequested)
   {
-    cout << "Listening for client connections..." << endl;
+    std::cout << "Listening for client connections..." << std::endl;
     int clientSocket = accept(this->serverSocket, nullptr, nullptr);
     if (clientSocket >= 0) 
     {
-        cout << "Client accepted" << endl;
+        std::cout << "Client accepted" << std::endl;
     }
     else 
     {
-        cerr << "Error accepting client connection." << endl;
+        std::cerr << "Error accepting client connection." << std::endl;
         return false;
     }
 
@@ -94,7 +91,7 @@ Server::bool acceptClients()
   return true;
 }
 
-Server::bool clientHandler(int clientSocket)
+bool Server::clientHandler(int clientSocket)
 {
   const char* welcomeMessage = "Welcome to myserver! Please login with LOGIN.\n";
   if (send(clientSocket, welcomeMessage, strlen(welcomeMessage), 0) == -1)
@@ -104,10 +101,10 @@ Server::bool clientHandler(int clientSocket)
     return false;
   }
 
-  string command = parser(clientSocket);
+  std::string command = parser(clientSocket);
   if(command.empty())
   {
-    cerr << "Command cannot be empty." << endl;
+    std::cerr << "Command cannot be empty." << std::endl;
     return false;
   }
 
@@ -116,12 +113,12 @@ Server::bool clientHandler(int clientSocket)
   return true;
 }
 
-Server::string parser(int clientSocket)
+std::string Server::parser(int clientSocket)
 {
   // Buffer reads the data, bytesRead determines the actual number of bytes read
   char buffer[BUFFER_SIZE];
   ssize_t bytesRead = 0;
-  string line;
+  std::string line;
 
   // Read the data and save it into the receivedData string
   while (true)
@@ -132,7 +129,7 @@ Server::string parser(int clientSocket)
 
       if (bytesRead <= 0)
       {
-          cerr << "Error while reading message body." << endl;
+          std::cerr << "Error while reading message body." << std::endl;
           close(clientSocket);
           return "";
       }
@@ -141,10 +138,10 @@ Server::string parser(int clientSocket)
       line += buffer; // Append buffer content to the line
 
       // Debug output
-      cout << "Received client input: " << buffer << endl;
+      std::cout << "Received client input: " << buffer << std::endl;
 
       // If a newline character is found, we have the full line
-      if (line.find("\n") != string::npos)
+      if (line.find("\n") != std::string::npos)
       {
           break;
       }
@@ -152,7 +149,7 @@ Server::string parser(int clientSocket)
 
   // Strip the newline character at the end, if present
   size_t pos = line.find("\n");
-  if (pos != string::npos)
+  if (pos != std::string::npos)
   {
       line = line.substr(0, pos);  // Remove the newline
   }
@@ -160,13 +157,13 @@ Server::string parser(int clientSocket)
   return line;
 }
 
-Server::void commandHandler(int clientSocket, string command)
+void Server::commandHandler(int clientSocket, std::string command)
 {
-  cout << "Received command: " << command << endl;
+  std::cout << "Received command: " << command << std::endl;
   
   if (command == "LOGIN")
   {
-    cout << "Handling LOGIN command" << endl;
+    std::cout << "Handling LOGIN command" << std::endl;
     if (loginHandler(clientSocket)) {
         sendResponse(clientSocket, true);  // OK LOGIN SUCCESSFUL
     } else {
@@ -175,7 +172,7 @@ Server::void commandHandler(int clientSocket, string command)
   }
   else if (command == "SEND")
   {
-    cout << "Handling SEND command" << endl;
+    std::cout << "Handling SEND command" << std::endl;
     if (sendHandler(clientSocket)) {
         sendResponse(clientSocket, true);  // OK MESSAGE SENT
     } else {
@@ -184,22 +181,22 @@ Server::void commandHandler(int clientSocket, string command)
   }
   else if (command == "LIST")
   {
-    cout << "Handling LIST command" << endl;
+    std::cout << "Handling LIST command" << std::endl;
     listHandler(clientSocket);
   }
   else if (command == "READ")
   {
-    cout << "Handling READ command" << endl;
+    std::cout << "Handling READ command" << std::endl;
     readHandler(clientSocket);
   }
   else if (command == "DEL")
   {
-    cout << "Handling DEL command" << endl;
+    std::cout << "Handling DEL command" << std::endl;
     delHandler(clientSocket);
   }
   else if (command == "QUIT")
   {
-    cout << "Handling QUIT command" << endl;
+    std::cout << "Handling QUIT command" << std::endl;
     sendResponse(clientSocket, true);  // OK CONNECTION CLOSED
     close(clientSocket);  // Close the connection after QUIT
   }
@@ -210,7 +207,7 @@ Server::void commandHandler(int clientSocket, string command)
   }
 }
 
-Server::bool loginHandler(int clientSocket)
+bool Server::loginHandler(int clientSocket)
 {
   char buffer[1024];
   ssize_t bytesRead;
@@ -221,14 +218,14 @@ Server::bool loginHandler(int clientSocket)
   
   if (bytesRead <= 0)
   {
-    cerr << "Error reading username from client." << endl;
+    std::cerr << "Error reading username from client." << std::endl;
     return false;
   }
 
   // Null-terminate the string received from the client
   buffer[bytesRead] = '\0';
-  string username(buffer);
-  cout << "User entered: " << username << endl; // Log the username
+  std::string username(buffer);
+  std::cout << "User entered: " << username << std::endl; // Log the username
 
   // Read the password sent by the client
   memset(buffer, 0, sizeof(buffer)); // Clear the buffer
@@ -236,14 +233,14 @@ Server::bool loginHandler(int clientSocket)
   
   if (bytesRead <= 0)
   {
-    cerr << "Error reading password from client." << endl;
+    std::cerr << "Error reading password from client." << std::endl;
     return false;
   }
 
   // Null-terminate the string received from the client
   buffer[bytesRead] = '\0';
-  string password(buffer);
-  cout << "Password entered: " << password << endl; // Log the password
+  std::string password(buffer);
+  std::cout << "Password entered: " << password << std::endl; // Log the password
 
   // For testing
   return true;
@@ -259,32 +256,32 @@ SEND\n
 */
 // -------------------------------------->MISSING PATH SPECIFICATION FOR ALL HANDLER FUNCTIONS<-----------------------------------------------
 //  Ignore the fact that this is a bool for now, it will come in handy later
-Server::bool sendHandler(int clientSocket)
+bool Server::sendHandler(int clientSocket)
 {
-  vector<string> body = sendParser(clientSocket);
+  std::vector<std::string> body = sendParser(clientSocket);
   if(body.empty() || body.size() < 3)
   {
     sendResponse(clientSocket, false);
-    cerr << "Invalid command syntax." << endl;
+    std::cerr << "Invalid command syntax." << std::endl;
     return false;
   }
 
   //  get the actual sender at some point, this just for testing
-  string sender = "if23b281";
-  string receiver = body[0];
-  string subject = body[1];
-  string message = body[2];
+  std::string sender = "if23b281";
+  std::string receiver = body[0];
+  std::string subject = body[1];
+  std::string message = body[2];
 
-  fstream fout;
-  string mailSpoolName = sender + ".csv";
+  std::fstream fout;
+  std::string mailSpoolName = sender + ".csv";
 
   //  Open or create a new file with the name
-  fout.open(mailSpoolName, ios::out | ios::app);
+  fout.open(mailSpoolName, std::ios::out | std::ios::app);
   //  Check if the file was opened successfully
   if(!fout.is_open())
   {
     sendResponse(clientSocket, false);
-    cerr << "Error occurred while opening Mail-Spool file." << endl;
+    std::cerr << "Error occurred while opening Mail-Spool file." << std::endl;
     return false;
   }
   
@@ -298,7 +295,7 @@ Server::bool sendHandler(int clientSocket)
   if(fout.fail())
   {
     fout.close();
-    cerr << "Error writing to Mail-Spool file." << endl;
+    std::cerr << "Error writing to Mail-Spool file." << std::endl;
     sendResponse(clientSocket, false);
     return false;
   }
@@ -310,10 +307,10 @@ Server::bool sendHandler(int clientSocket)
 }
 
 //  ??? hopefully this shit works now
-Server::vector<string> sendParser(int clientSocket)
+std::vector<std::string> Server::sendParser(int clientSocket)
 {
-  vector<string> body;
-  string line;
+  std::vector<std::string> body;
+  std::string line;
 
   while(1)
   {
@@ -349,28 +346,28 @@ Server::vector<string> sendParser(int clientSocket)
 LIST\n 
 */
 //  this function should list everything inside the csv file for the specified user
-Server::void listHandler(int clientSocket)
+void Server::listHandler(int clientSocket)
 {
   //  temporary
-  string sender = "if23b281";
-  fstream fin;
-  string mailSpoolName = sender + ".csv";
+  std::string sender = "if23b281";
+  std::fstream fin;
+  std::string mailSpoolName = sender + ".csv";
 
-  fin.open(mailSpoolName, ios::in);
+  fin.open(mailSpoolName, std::ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
+    std::cerr << "File does not exist." << std::endl;
     return;
   }
 
-  string line;
-  vector<string> subjects;
+  std::string line;
+  std::vector<std::string> subjects;
   //  Loop until the end of the file
   while(getline(fin, line))
   {
-    stringstream ss(line);
-    string receiver, subject, message;
+    std::stringstream ss(line);
+    std::string receiver, subject, message;
 
     getline(ss, receiver, ';');
     getline(ss, subject, ';');
@@ -380,7 +377,7 @@ Server::void listHandler(int clientSocket)
   }
   fin.close();
   
-  string response = "Message Count: " + to_string(subjects.size()) + "\n";
+  std::string response = "Message Count: " + std::to_string(subjects.size()) + "\n";
 
   for(int i = 0; i < subjects.size(); i++)
   {
@@ -395,39 +392,39 @@ READ\n
 <Message-Number>\n 
 */
 //  Could be improved further, same as one above
-Server::void readHandler(int clientSocket)
+void Server::readHandler(int clientSocket)
 {
   int messageNr;
   try
   {
     messageNr = stoi(parser(clientSocket));
   }
-  catch(const exception& e)
+  catch(const std::exception& e)
   {
     sendResponse(clientSocket, false);
-    cerr << "Message number has to be of integer type." << endl;
+    std::cerr << "Message number has to be of integer type." << std::endl;
     return;
   }
 
-  string sender = "if23b281";
-  fstream fin;
-  string mailSpoolName = sender + ".csv";
+  std::string sender = "if23b281";
+  std::fstream fin;
+  std::string mailSpoolName = sender + ".csv";
 
-  fin.open(mailSpoolName, ios::in);
+  fin.open(mailSpoolName, std::ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
+    std::cerr << "File does not exist." << std::endl;
     return;
   }
 
-  string line;
-  string response;
+  std::string line;
+  std::string response;
   int count = 1;
   while(getline(fin, line))
   {
-    stringstream ss(line);
-    string receiver, subject, message;
+    std::stringstream ss(line);
+    std::string receiver, subject, message;
 
     getline(ss, receiver, ';');
     getline(ss, subject, ';');
@@ -445,7 +442,7 @@ Server::void readHandler(int clientSocket)
   if(response.empty())
   {
     sendResponse(clientSocket, false);
-    cerr << "Message does not exist." << endl;
+    std::cerr << "Message does not exist." << std::endl;
   }
   else
   {
@@ -458,45 +455,46 @@ DEL\n
 <Message-Number>\n 
 */
 // Copy the file contents without the specified line into a temporary file and replace the original file
-Server::void delHandler(int clientSocket)
+void Server::delHandler(int clientSocket)
 {
-  string sender = "if23b281";
+  std::string sender = "if23b281";
   int messageNr;
   try
   {
     messageNr = stoi(parser(clientSocket));
   }
-  catch(const exception& e)
+  catch(const std::exception& e)
   {
     sendResponse(clientSocket, false);
-    cerr << "Message number has to be of integer type." << endl;
+    std::cerr << "Message number has to be of integer type." << std::endl;
+    std::cerr << "Error:" << e.what() << std::endl;
     return;
   }
 
   //fstream fin;
   //fstream tempFile;
   //  Should probably save the name somewhere atp...
-  string mailSpoolName = sender + ".csv";
-  string tempFileName = sender + "Temp.csv";
+  std::string mailSpoolName = sender + ".csv";
+  std::string tempFileName = sender + "Temp.csv";
 
-  fstream fin(mailSpoolName, ios::in);
+  std::fstream fin(mailSpoolName, std::ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
+    std::cerr << "File does not exist." << std::endl;
     return;
   }
 
-  fstream tempFile(tempFileName, ios::out);
+  std::fstream tempFile(tempFileName, std::ios::out);
   if(!tempFile.is_open())
   {
     sendResponse(clientSocket, false);
-    cerr << "Error while opening temporary file for writing." << endl;
+    std::cerr << "Error while opening temporary file for writing." << std::endl;
     fin.close();
     return;
   }
 
-  string line;
+  std::string line;
   int count = 1;
   bool fileFound = false;
 
@@ -522,7 +520,7 @@ Server::void delHandler(int clientSocket)
   {
     if (remove(mailSpoolName.c_str()) != 0 || rename(tempFileName.c_str(), mailSpoolName.c_str()) != 0) {
         sendResponse(clientSocket, false);
-        cerr << "Error updating the mail file." << endl;
+        std::cerr << "Error updating the mail file." << std::endl;
         return;
     }
     sendResponse(clientSocket, true);
@@ -531,12 +529,12 @@ Server::void delHandler(int clientSocket)
   {
     remove(tempFileName.c_str());
     sendResponse(clientSocket, false);
-    cerr << "Message number not found." << endl;
+    std::cerr << "Message number not found." << std::endl;
   }
 }
 
 //  Function that handles simple responses to the client
-Server::void sendResponse(int clientSocket, bool state)
+void Server::sendResponse(int clientSocket, bool state)
 {
   if(state)
   {
