@@ -546,89 +546,51 @@ void Server::sendResponse(int clientSocket, bool state)
   }
 }
 
-
-/*
-int connectLdap(int client_socket)
+bool Server::establishLDAPConnection(const std::string& bindPassword)
 {
-  LDAP *ld;
-  int ldapVersion = LDAP_VERSION3;
-  int rc = 0;
+    LDAP* ldapHandle;
+    int result;
 
-  char buffer[BUFFER_SIZE];
-  string username, password;
-  
-  memset(buffer, 0, BUFFER_SIZE);
-  // Get username from client
-  recv(client_socket, buffer, sizeof(buffer), 0);
-  username = buffer;
-  memset(buffer, 0, BUFFER_SIZE);
-  // Get password from client
-  recv(client_socket, buffer, sizeof(buffer), 0);
-  password = buffer;
+    // Initialize LDAP connection using the class member ldapServer
+    result = ldap_initialize(&ldapHandle, ldapServer);
+    if (result != LDAP_SUCCESS)
+    {
+        std::cerr << "Failed to initialize LDAP connection: " << ldap_err2string(result) << std::endl;
+        return false;
+    }
+    std::cout << "LDAP connection initialized successfully." << std::endl;
 
-  // Initialize LDAP connection
-  rc = ldap_initialize(&ld, ldapServer);
-  if (rc != LDAP_SUCCESS)
-  {
-      fprintf(stderr, "ldap_init failed\n");
-      return EXIT_FAILURE;
-  }
-  printf("connected to LDAP server %s\n", ldapServer);
+    // Set LDAP options (optional but recommended)
+    int protocolVersion = LDAP_VERSION3;
+    result = ldap_set_option(ldapHandle, LDAP_OPT_PROTOCOL_VERSION, &protocolVersion);
+    if (result != LDAP_SUCCESS)
+    {
+        std::cerr << "Failed to set LDAP protocol version: " << ldap_err2string(result) << std::endl;
+        ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+        return false;
+    }
+    std::cout << "LDAP protocol version set to 3." << std::endl;
 
-  // Set LDAP protocol version to 3.0
-  rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
-  if (rc == LDAP_SUCCESS)
-      printf("ldap_set_option succeeded - version set to 3\n");
-  else
-  {
-      printf("SetOption Error:%0X\n", rc);
-  }
+    // Bind to the LDAP server using the class member ldapBind
+    BerValue bindCredentials;
+    bindCredentials.bv_val = const_cast<char*>(bindPassword.c_str());
+    bindCredentials.bv_len = bindPassword.length();
 
-  // Start a secure TLS connection
-  rc = ldap_start_tls_s(ld, NULL, NULL);
-  if (rc != LDAP_SUCCESS)
-  {
-      fprintf(stderr, "ldap_start_tls_s() failed: %s\n", ldap_err2string(rc));
-      ldap_unbind_ext_s(ld, NULL, NULL);
-      return -1;
-  }
+    BerValue* serverCredentials = nullptr;
+    result = ldap_sasl_bind_s(ldapHandle, ldapBind, LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, &serverCredentials);
 
-  // Prepare the DN for SASL authentication
-  char dn[256];
-  sprintf(dn, "uid=%s,%s", username.c_str(), ldapBind);
-  cout << "Attempting SASL bind with DN: " << dn << endl;
-  // Perform SASL bind (using the PLAIN authentication method)
-  rc = ldap_sasl_bind_s(ld, dn, LDAP_SASL_SIMPLE, &password[0], NULL, NULL, NULL);
-  if (rc != LDAP_SUCCESS)
-  {
-      loginAttempts += 1;
-      cerr << "Authentication failed for user " << username << endl;
-      if (loginAttempts == maxLoginAttempts)
-      {
-          // Lock the account after 3 failed login attempts
-          strcpy(buffer, "Too many login attempts! You are blacklisted for 1 minute.\n");
-          if (send(client_socket, buffer, strlen(buffer), 0) == -1)
-          {
-              perror("send failed");
-              return -1;
-          }
-          std::this_thread::sleep_for(std::chrono::minutes(1));
-          loginAttempts = 0;
-      }
-      ldap_unbind_ext_s(ld, NULL, NULL);
-      return -1;
-  }
+    if (result != LDAP_SUCCESS)
+    {
+        std::cerr << "LDAP bind failed: " << ldap_err2string(result) << std::endl;
+        ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+        return false;
+    }
+    std::cout << "LDAP bind successful." << std::endl;
 
-  cout << "SASL bind as " << username << " was successful!" << endl;
-
-  // Save the current user
-  currentUser = username;
-
-  // Unbind and close the LDAP connection
-  ldap_unbind_ext_s(ld, NULL, NULL);
-  return 0;
+    // Connection is established successfully
+    ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+    return true;
 }
-*/
 
 
 
