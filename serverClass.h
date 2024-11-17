@@ -11,16 +11,17 @@ using namespace std::filesystem;
 class Server
 {
   private:
-    int port;
     std::string mailSpoolDir;
     int serverSocket = -1;
     int reuseValue = 1;
     int abortRequested = 0;
+    //bool threadStatus;
     const int maxLoginAttempts = 3;
     int loginAttempts = 0;
     std::string currentUser ="";
     const char *ldapServer = "ldap://ldap.technikum-wien.at:389";
     const char *ldapBind = "ou=people,dc=technikum-wien,dc=at";
+    sockaddr_in serverAddress;
 
   public:
     Server(int port, std::string mailSpoolDir);

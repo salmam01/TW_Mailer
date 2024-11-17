@@ -1,7 +1,16 @@
 #include "serverClass.h"
 #include "serverHeaders.h"
 
-Server::Server(int port, std::string mailSpoolDir): port(port),mailSpoolDir(mailSpoolDir){}
+Server::Server(int port, std::string mailSpoolDir)
+{
+  //  AF_INET = IPv4
+  memset(&this->serverAddress, 0, sizeof(this->serverAddress));
+  this->serverAddress.sin_family = AF_INET;
+  this->serverAddress.sin_port = htons(port);
+  this->serverAddress.sin_addr.s_addr = INADDR_ANY;
+
+  this->mailSpoolDir = mailSpoolDir;
+} 
 
 bool Server::start()
 {
@@ -32,14 +41,7 @@ bool Server::start()
       return false;
   }
 
-  //  AF_INET = IPv4
-  sockaddr_in serverAddress;
-  memset(&serverAddress, 0, sizeof(serverAddress));
-  serverAddress.sin_family = AF_INET;
-  serverAddress.sin_port = htons(this->port);
-  serverAddress.sin_addr.s_addr = INADDR_ANY;
-
-  std::cout << "Port: " << this->port << std::endl;
+  std::cout << "Port: " << this->serverAddress.sin_port << std::endl;
   std::cout << "Mail-Spool Directory: " << this->mailSpoolDir << std::endl;
 
   //  Binding socket
@@ -63,6 +65,7 @@ bool Server::start()
   {
     return false;
   }
+
   close(this->serverSocket);
   return true;
 }
@@ -71,46 +74,61 @@ bool Server::acceptClients()
 {
   while(!abortRequested)
   {
-    std::cout << "Listening for client connections..." << std::endl;
+    std::cout << "Listening for client connections on port " << this->serverAddress.sin_port << std::endl;
     int clientSocket = accept(this->serverSocket, nullptr, nullptr);
     if (clientSocket >= 0) 
     {
-        std::cout << "Client accepted" << std::endl;
+      //  Create a thread for each client connection and pass the function and parameter
+      std::cout << "Client accepted." << std::endl;
+      std::thread clientThread(&Server::clientHandler, this, clientSocket);
+      //  Main thread continues executing without waiting for the clientThread
+      clientThread.detach();
     }
     else 
     {
-        std::cerr << "Error accepting client connection." << std::endl;
-        return false;
+      std::cerr << "Error accepting client connection." << std::endl;
+      return false;
     }
-
-    //  Need to look into threads for concurrent server
-    //thread t(clientHandler, clientSocket);
-    //t.detach();
-    clientHandler(clientSocket);
   }
   return true;
 }
 
 bool Server::clientHandler(int clientSocket)
 {
-  const char* welcomeMessage = "Welcome to myserver! Please login with LOGIN.\n";
-  if (send(clientSocket, welcomeMessage, strlen(welcomeMessage), 0) == -1)
+  try
   {
-    perror("send failed");
-    close(clientSocket);  // Close the socket on failure
-    return false;
-  }
+    std::string welcomeMessage = "Welcome to our Mail Server! Please login with LOGIN.\n";
+    if (send(clientSocket, welcomeMessage.c_str(), strlen(welcomeMessage), 0) == -1)
+    {
+      // Close the socket on failure
+      std::cerr << "Send failed." << std::endl;
+      return false;
+    }
 
-  std::string command = parser(clientSocket);
-  if(command.empty())
+    std::string command = parser(clientSocket);
+    if(command.empty())
+    {
+      std::cerr << "Command cannot be empty." << std::endl;
+      return false;
+    }
+
+    //  Pass the command to the commandHandler if it's not empty
+    commandHandler(clientSocket, command);
+    return true;
+
+  }
+  catch(const std::exception &e)
   {
-    std::cerr << "Command cannot be empty." << std::endl;
-    return false;
+    std::cerr << "Exception in clientHandler: " << e.what() << std::endl;
+    sendResponse(clientSocket, false);
+    close(clientSocket);
   }
-
-  //  Pass the command to the commandHandler if it's not empty
-  commandHandler(clientSocket, command);
-  return true;
+  catch(...)
+  {
+    std::cerr << "An unknown error occurred. Connection will terminate." << std::endl;
+    sendResponse(clientSocket, false);
+    close(clientSocket);
+  }
 }
 
 std::string Server::parser(int clientSocket)

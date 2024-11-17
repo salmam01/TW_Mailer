@@ -1,7 +1,5 @@
 #include <iostream>
 #include "serverClass.h"
-#include "serverClass.cpp"
-
 
 using namespace std;
 

@@ -49,6 +49,15 @@
         "xiosbase": "cpp",
         "fstream": "cpp",
         "xutility": "cpp",
-        "xlocmes": "cpp"
+        "xlocmes": "cpp",
+        "chrono": "cpp",
+        "codecvt": "cpp",
+        "ctime": "cpp",
+        "ratio": "cpp",
+        "iomanip": "cpp",
+        "semaphore": "cpp",
+        "sstream": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp"
     }
 }
