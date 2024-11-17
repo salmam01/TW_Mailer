@@ -2,7 +2,7 @@
 #define SERVER_CLASS_H
 
 #define BUFFER_SIZE 1024
-#define MAIL_SPOOL_DIR "/mail_spool"
+//#define MAIL_SPOOL_DIR "/mail_spool" --> not sure if we need it
 
 #include "serverHeaders.h"
 
@@ -13,13 +13,13 @@ class Server
     struct MailSpoolDir
     {
       std::string name;
-      std::filesystem::path path = MAIL_SPOOL_DIR;
+      std::filesystem::path path;
     };
 
     MailSpoolDir mailSpoolDir;
     int serverSocket = -1;
     int reuseValue = 1;
-    int abortRequested = 0;
+    bool abortRequested = false;
     const int maxLoginAttempts = 3;
     int loginAttempts = 0;
     std::string currentUser ="";
@@ -30,12 +30,12 @@ class Server
   public:
     Server(int port, std::string mailSpoolName);
     bool start();
-    bool acceptClients();
-    bool clientHandler(int clientSocket);
+    void acceptClients();
+    void clientHandler(int clientSocket);
     std::string parser(int clientSocket);
     void commandHandler(int clientSocket, std::string command);
     bool loginHandler(int clientSocket);
-    bool sendHandler(int clientSocket);
+    void sendHandler(int clientSocket);
     std::vector<std::string> sendParser(int clientSocket);
     void listHandler(int clientSocket);
     void readHandler(int clientSocket);

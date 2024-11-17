@@ -29,16 +29,6 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  ////////////////////////////////////////////////////////////////////////////
-  // SIGNAL HANDLER
-  // SIGINT (Interrupt: ctrl+c)
-  // https://man7.org/linux/man-pages/man2/signal.2.html
-  /*if (signal(SIGINT, signalHandler) == SIG_ERR)
-  {
-    perror("signal can not be registered");
-    return EXIT_FAILURE;
-  }*/
-
   Server server(port, argv[2]);
   if(!(server.start()))
   {

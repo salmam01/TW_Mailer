@@ -7,7 +7,6 @@ using namespace filesystem;
 
 Server::Server(int port, string mailSpoolDirName)
 {
-  //  AF_INET = IPv4
   memset(&this->serverAddress, 0, sizeof(this->serverAddress));
   this->serverAddress.sin_family = AF_INET;
   this->serverAddress.sin_port = htons(port);
@@ -36,6 +35,7 @@ bool Server::start()
     return false;
   }
 
+  //  Set socket options 
   if (setsockopt(this->serverSocket,
                       SOL_SOCKET,
                       SO_REUSEADDR,
@@ -51,9 +51,9 @@ bool Server::start()
                       SO_REUSEPORT,
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
-      {
-      cerr << "Set socket options - reusePort" << endl;
-      return false;
+  {
+    cerr << "Set socket options - reusePort" << endl;
+    return false;
   }
 
   cout << "Port: " << this->serverAddress.sin_port << endl;
@@ -76,17 +76,15 @@ bool Server::start()
     return false;
   }
 
-  //  Accept client
-  if(!acceptClients())
-  {
-    return false;
-  }
-
+  //  Accept clients
+  acceptClients();
+  
   close(this->serverSocket);
   return true;
 }
 
-bool Server::acceptClients()
+//  Function that can accept up to 5 clients simultaneously until the server is closed manually
+void Server::acceptClients()
 {
   while(!abortRequested)
   {
@@ -102,48 +100,47 @@ bool Server::acceptClients()
     }
     else 
     {
-      cerr << "Error accepting client connection." << endl;
-      return false;
+      cerr << "Error accepting client connection: " << strerror(errno) << endl;
+      continue;
     }
   }
-  return true;
 }
 
-bool Server::clientHandler(int clientSocket)
+void Server::clientHandler(int clientSocket)
 {
   try
   {
     string welcomeMessage = "Welcome to our Mail Server! Please login with LOGIN.\n";
-    if (send(clientSocket, welcomeMessage.c_str(), strlen(welcomeMessage), 0) == -1)
+    if (send(clientSocket, welcomeMessage.c_str(), welcomeMessage.size(), 0) == -1)
     {
-      // Close the socket on failure
       cerr << "Send failed." << endl;
-      return false;
+      return;
     }
 
     string command = parser(clientSocket);
-    if(command.empty())
+    if(!command.empty())
+    {
+      commandHandler(clientSocket, command);
+    }
+    else
     {
       cerr << "Command cannot be empty." << endl;
-      return false;
+      return;
     }
-
-    //  Pass the command to the commandHandler if it's not empty
-    commandHandler(clientSocket, command);
-    return true;
-
   }
   catch(const exception &e)
   {
     cerr << "Exception in clientHandler: " << e.what() << endl;
     sendResponse(clientSocket, false);
     close(clientSocket);
+    return;
   }
   catch(...)
   {
     cerr << "An unknown error occurred. Connection will terminate." << endl;
     sendResponse(clientSocket, false);
     close(clientSocket);
+    return;
   }
 }
 
@@ -191,53 +188,53 @@ string Server::parser(int clientSocket)
   return line;
 }
 
+//  Function that handles each command 
 void Server::commandHandler(int clientSocket, string command)
 {
   cout << "Received command: " << command << endl;
   
   if (command == "LOGIN")
   {
-    cout << "Handling LOGIN command" << endl;
-    if (loginHandler(clientSocket)) {
-        sendResponse(clientSocket, true);  // OK LOGIN SUCCESSFUL
-    } else {
-        sendResponse(clientSocket, false); // ERR LOGIN FAILED
+    cout << "Handling LOGIN command." << endl;
+    if (loginHandler(clientSocket)) 
+    {
+      sendResponse(clientSocket, true);
+    } else 
+    {
+      sendResponse(clientSocket, false);
     }
   }
   else if (command == "SEND")
   {
-    cout << "Handling SEND command" << endl;
-    if (sendHandler(clientSocket)) {
-        sendResponse(clientSocket, true);  // OK MESSAGE SENT
-    } else {
-        sendResponse(clientSocket, false); // ERR MESSAGE SEND FAILED
-    }
+    cout << "Handling SEND command." << endl;
+    sendHandler(clientSocket); 
   }
   else if (command == "LIST")
   {
-    cout << "Handling LIST command" << endl;
+    cout << "Handling LIST command." << endl;
     listHandler(clientSocket);
   }
   else if (command == "READ")
   {
-    cout << "Handling READ command" << endl;
+    cout << "Handling READ command." << endl;
     readHandler(clientSocket);
   }
   else if (command == "DEL")
   {
-    cout << "Handling DEL command" << endl;
+    cout << "Handling DEL command." << endl;
     delHandler(clientSocket);
   }
   else if (command == "QUIT")
   {
-    cout << "Handling QUIT command" << endl;
-    sendResponse(clientSocket, true);  // OK CONNECTION CLOSED
-    close(clientSocket);  // Close the connection after QUIT
+    cout << "Handling QUIT command." << endl;
+    sendResponse(clientSocket, true);
+    close(clientSocket);
   }
   else
   {
     // Invalid command
-    sendResponse(clientSocket, false); // ERR INVALID COMMAND
+    sendResponse(clientSocket, false);
+    cerr << "Invalid Command." << endl;
   }
 }
 
@@ -278,308 +275,6 @@ bool Server::loginHandler(int clientSocket)
 
   // For testing
   return true;
-}
-
-
-/*
-SEND\n 
-<Receiver>\n 
-<Subject (max. 80 chars)>\n 
-<message (multi-line; no length restrictions)\n> 
-.\n  
-*/
-// -------------------------------------->MISSING PATH SPECIFICATION FOR ALL HANDLER FUNCTIONS<-----------------------------------------------
-//  Ignore the fact that this is a bool for now, it will come in handy later
-bool Server::sendHandler(int clientSocket)
-{
-  vector<string> body = sendParser(clientSocket);
-  if(body.empty() || body.size() < 3)
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Invalid SEND command syntax." << endl;
-    return false;
-  }
-
-  path path = 
-
-  //  get the actual sender at some point, this just for testing
-  string sender = "if23b281";
-  string receiver = body[0];
-  string subject = body[1];
-  string message = body[2];
-
-  fstream fout;
-  string mailSpoolName = sender + ".csv";
-
-  //  Open or create a new file with the name
-  fout.open(mailSpoolName, ios::out | ios::app);
-  //  Check if the file was opened successfully
-  if(!fout.is_open())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Error occurred while opening Mail-Spool file." << endl;
-    return false;
-  }
-  
-  fout  << receiver << ";"
-        << subject << ";"
-        << '"' 
-        << message 
-        << '"'
-        << "\n"; 
-
-  if(fout.fail())
-  {
-    fout.close();
-    cerr << "Error writing to Mail-Spool file." << endl;
-    sendResponse(clientSocket, false);
-    return false;
-  }
-
-  fout.close();
-
-  sendResponse(clientSocket, true);
-  return true;
-}
-
-//  ??? hopefully this shit works now
-vector<string> Server::sendParser(int clientSocket)
-{
-  vector<string> body;
-  string line;
-
-  while(1)
-  {
-    //  Use the parser function to extract each line
-    line = parser(clientSocket);
-
-    if (line == ".") 
-    {
-      break;
-    }
-
-    if(body.size() < 3)
-    {
-      // Save receiver, subject
-      body.push_back(line);
-    }
-    //  If body size is greater than 3, save the message into one index
-    else
-    {
-      //  Initialize the vector index, then append the message lines
-      if(body.size() == 3)
-      {
-        body.push_back("");
-      }
-      body[3] += line + "\n";
-    }
-  }
-  
-  return body;
-}
-
-/*
-LIST\n 
-*/
-//  this function should list everything inside the csv file for the specified user
-void Server::listHandler(int clientSocket)
-{
-  //  temporary
-  string sender = "if23b281";
-  fstream fin;
-  string mailSpoolName = sender + ".csv";
-
-  fin.open(mailSpoolName, ios::in);
-  if(!fin.is_open())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
-    return;
-  }
-
-  string line;
-  vector<string> subjects;
-  //  Loop until the end of the file
-  while(getline(fin, line))
-  {
-    stringstream ss(line);
-    string receiver, subject, message;
-
-    getline(ss, receiver, ';');
-    getline(ss, subject, ';');
-    getline(ss, message);
-
-    subjects.push_back(subject);
-  }
-  fin.close();
-  
-  string response = "Message Count: " + to_string(subjects.size()) + "\n";
-
-  for(int i = 0; i < subjects.size(); i++)
-  {
-    response += subjects[i] + "\n";
-  }
-
-  send(clientSocket, response.c_str(), response.size(), 0);
-}
-
-/*
-READ\n 
-<Message-Number>\n 
-*/
-//  Could be improved further, same as one above
-void Server::readHandler(int clientSocket)
-{
-  int messageNr;
-  try
-  {
-    messageNr = stoi(parser(clientSocket));
-  }
-  catch(const exception& e)
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Message number has to be of integer type." << endl;
-    return;
-  }
-
-  string sender = "if23b281";
-  fstream fin;
-  string mailSpoolName = sender + ".csv";
-
-  fin.open(mailSpoolName, ios::in);
-  if(!fin.is_open())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
-    return;
-  }
-
-  string line;
-  string response;
-  int count = 1;
-  while(getline(fin, line))
-  {
-    stringstream ss(line);
-    string receiver, subject, message;
-
-    getline(ss, receiver, ';');
-    getline(ss, subject, ';');
-    getline(ss, message);
-
-    if(count == messageNr)
-    {
-      response = message; 
-      break;
-    }
-    count++;
-  }
-  fin.close();
-
-  if(response.empty())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Message does not exist." << endl;
-  }
-  else
-  {
-    send(clientSocket, response.c_str(), response.size(), 0);
-  }
-}
-
-/*
-DEL\n 
-<Message-Number>\n 
-*/
-// Copy the file contents without the specified line into a temporary file and replace the original file
-void Server::delHandler(int clientSocket)
-{
-  string sender = "if23b281";
-  int messageNr;
-  try
-  {
-    messageNr = stoi(parser(clientSocket));
-  }
-  catch(const exception& e)
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Message number has to be of integer type." << endl;
-    cerr << "Error:" << e.what() << endl;
-    return;
-  }
-
-  //fstream fin;
-  //fstream tempFile;
-  //  Should probably save the name somewhere atp...
-  string mailSpoolName = sender + ".csv";
-  string tempFileName = sender + "Temp.csv";
-
-  fstream fin(mailSpoolName, ios::in);
-  if(!fin.is_open())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "File does not exist." << endl;
-    return;
-  }
-
-  fstream tempFile(tempFileName, ios::out);
-  if(!tempFile.is_open())
-  {
-    sendResponse(clientSocket, false);
-    cerr << "Error while opening temporary file for writing." << endl;
-    fin.close();
-    return;
-  }
-
-  string line;
-  int count = 1;
-  bool fileFound = false;
-
-  while(getline(fin, line))
-  {
-    //  Skip the line if it's found 
-    if(count == messageNr)
-    {
-      fileFound = true;
-    }
-    //  Write all other lines into the temporary file
-    else
-    {
-      tempFile << line << "\n";
-    }
-    count++;
-  }
-
-  fin.close();
-  tempFile.close();
-
-  if(fileFound)
-  {
-    if (remove(mailSpoolName.c_str()) != 0 || rename(tempFileName.c_str(), mailSpoolName.c_str()) != 0) {
-        sendResponse(clientSocket, false);
-        cerr << "Error updating the mail file." << endl;
-        return;
-    }
-    sendResponse(clientSocket, true);
-  }
-  else
-  {
-    remove(tempFileName.c_str());
-    sendResponse(clientSocket, false);
-    cerr << "Message number not found." << endl;
-  }
-}
-
-//  Function that handles simple responses to the client
-void Server::sendResponse(int clientSocket, bool state)
-{
-  if(state)
-  {
-    send(clientSocket, "OK\n", 3, 0);
-  }
-  else
-  {
-    send(clientSocket, "ERR\n", 4, 0);
-  }
 }
 
 bool Server::establishLDAPConnection(const string& bindPassword)
@@ -628,7 +323,281 @@ bool Server::establishLDAPConnection(const string& bindPassword)
     return true;
 }
 
+//  Function to save a sent message inside a csv file
+void Server::sendHandler(int clientSocket)
+{
+  vector<string> body = sendParser(clientSocket);
+  if(body.empty() || body.size() < 3)
+  {
+    sendResponse(clientSocket, false);
+    cerr << "Invalid SEND command syntax." << endl;
+    return;
+  }
 
+  //  get the actual sender at some point, this just for testing
+  string sender = "if23b281";
+  string receiver = body[0];
+  string subject = body[1];
+  string message = body[2];
 
+  fstream fout;
+  //  Save the new file name as sender.csv inside the Mail Spool Directory location
+  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
 
+  //  Open or create a new file with the name (if none exists yet)
+  fout.open(mailSpoolFile, ios::out | ios::app);
+  //  Check if the file was opened successfully
+  if(!fout.is_open())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "Error occurred while opening Mail-Spool file:" << mailSpoolFile << endl;
+    return;
+  }
+  
+  //  Write the information and message into the file
+  fout  << receiver << ";"
+        << subject << ";"
+        << '"' 
+        << message 
+        << '"'
+        << "\n"; 
 
+  if(fout.fail())
+  {
+    fout.close();
+    sendResponse(clientSocket, false);
+    cerr << "Error writing to Mail-Spool file: " << mailSpoolFile << endl;
+    return;
+  }
+
+  fout.close();
+  sendResponse(clientSocket, true);
+}
+
+//  Helper function of sendHandler to parse the request body 
+//  Important: Add a limit on how many characters a client can send 
+vector<string> Server::sendParser(int clientSocket)
+{
+  vector<string> body;
+  string line;
+
+  while(1)
+  {
+    //  Use the parser function to extract each line
+    line = parser(clientSocket);
+
+    if (line == ".") 
+    {
+      break;
+    }
+
+    if(body.size() < 3)
+    {
+      // Save receiver, subject
+      body.push_back(line);
+    }
+    //  If body size is greater than 3, save the message into one index
+    else
+    {
+      //  Initialize the vector index, then append the message lines
+      if(body.size() == 3)
+      {
+        body.push_back("");
+      }
+      body[3] += line + "\n";
+    }
+  }
+  
+  return body;
+}
+
+//  Function that lists everything inside the csv file for the specified user
+void Server::listHandler(int clientSocket)
+{
+  //  temporary
+  string sender = "if23b281";
+  fstream fin;
+  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+
+  fin.open(mailSpoolFile, ios::in);
+  if(!fin.is_open())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "File does not exist: " << mailSpoolFile << endl;
+    return;
+  }
+
+  string line;
+  vector<string> subjects;
+  //  Loop until the end of the file
+  while(getline(fin, line))
+  {
+    stringstream ss(line);
+    string receiver, subject, message;
+
+    getline(ss, receiver, ';');
+    getline(ss, subject, ';');
+    getline(ss, message);
+
+    subjects.push_back(subject);
+  }
+  fin.close();
+  
+  string response = "Message Count: " + to_string(subjects.size()) + "\n";
+
+  for(int i = 0; i < subjects.size(); i++)
+  {
+    response += subjects[i] + "\n";
+  }
+
+  send(clientSocket, response.c_str(), response.size(), 0);
+}
+
+//  Function to read a specific message
+void Server::readHandler(int clientSocket)
+{
+  int messageNr;
+  try
+  {
+    messageNr = stoi(parser(clientSocket));
+  }
+  catch(const exception& e)
+  {
+    cerr << "Message number has to be of integer type." << endl;
+    sendResponse(clientSocket, false);
+    return;
+  }
+
+  string sender = "if23b281";
+  fstream fin;
+  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+
+  fin.open(mailSpoolFile, ios::in);
+  if(!fin.is_open())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "File does not exist: " << mailSpoolFile << endl;
+    return;
+  }
+
+  string line;
+  string response;
+  int count = 1;
+  while(getline(fin, line))
+  {
+    stringstream ss(line);
+    string receiver, subject, message;
+
+    getline(ss, receiver, ';');
+    getline(ss, subject, ';');
+    getline(ss, message);
+
+    if(count == messageNr)
+    {
+      response = message; 
+      break;
+    }
+    count++;
+  }
+  fin.close();
+
+  if(response.empty())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "Message does not exist." << endl;
+  }
+  else
+  {
+    send(clientSocket, response.c_str(), response.size(), 0);
+  }
+}
+
+// Function to delete a specific message
+void Server::delHandler(int clientSocket)
+{
+  string sender = "if23b281";
+  int messageNr;
+  try
+  {
+    messageNr = stoi(parser(clientSocket));
+  }
+  catch(const exception& e)
+  {
+    sendResponse(clientSocket, false);
+    cerr << "Message number has to be of integer type." << endl;
+    cerr << "Error:" << e.what() << endl;
+    return;
+  }
+
+  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+  string tempFilePath = (mailSpoolDir.path / (sender + "Temp.csv")).string();
+
+  fstream fin(mailSpoolFile, ios::in);
+  if(!fin.is_open())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "File does not exist: " << mailSpoolFile << endl;
+    return;
+  }
+
+  fstream tempFile(tempFilePath, ios::out);
+  if(!tempFile.is_open())
+  {
+    sendResponse(clientSocket, false);
+    cerr << "Error while opening temporary file for writing: " << tempFilePath << endl;
+    fin.close();
+    return;
+  }
+
+  string line;
+  int count = 1;
+  bool fileFound = false;
+
+  // Copy the file contents without the specified line into a temporary file and replace the original file
+  while(getline(fin, line))
+  {
+    //  Skip the line if it's found 
+    if(count == messageNr)
+    {
+      fileFound = true;
+    }
+    //  Write all other lines into the temporary file
+    else
+    {
+      tempFile << line << "\n";
+    }
+    count++;
+  }
+
+  fin.close();
+  tempFile.close();
+
+  if(fileFound)
+  {
+    if (remove(mailSpoolFile.c_str()) != 0 || rename(tempFilePath.c_str(), mailSpoolFile.c_str()) != 0) {
+      sendResponse(clientSocket, false);
+      cerr << "Error updating the mail file: " << mailSpoolFile << endl;
+      return;
+    }
+    sendResponse(clientSocket, true);
+  }
+  else
+  {
+    remove(tempFilePath.c_str());
+    sendResponse(clientSocket, false);
+    cerr << "Message number not found: " << messageNr << endl;
+  }
+}
+
+//  Function that handles simple responses to the client
+void Server::sendResponse(int clientSocket, bool state)
+{
+  if(state)
+  {
+    send(clientSocket, "OK\n", 3, 0);
+  }
+  else
+  {
+    send(clientSocket, "ERR\n", 4, 0);
+  }
+}
