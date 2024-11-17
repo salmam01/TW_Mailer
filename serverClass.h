@@ -1,21 +1,25 @@
 #ifndef SERVER_CLASS_H
 #define SERVER_CLASS_H
 
-#include "serverHeaders.h"
-
 #define BUFFER_SIZE 1024
 #define MAIL_SPOOL_DIR "/mail_spool"
 
-using namespace std::filesystem;
+#include "serverHeaders.h"
+
 
 class Server
 {
   private:
-    std::string mailSpoolDir;
+    struct MailSpoolDir
+    {
+      std::string name;
+      std::filesystem::path path = MAIL_SPOOL_DIR;
+    };
+
+    MailSpoolDir mailSpoolDir;
     int serverSocket = -1;
     int reuseValue = 1;
     int abortRequested = 0;
-    //bool threadStatus;
     const int maxLoginAttempts = 3;
     int loginAttempts = 0;
     std::string currentUser ="";
@@ -24,7 +28,7 @@ class Server
     sockaddr_in serverAddress;
 
   public:
-    Server(int port, std::string mailSpoolDir);
+    Server(int port, std::string mailSpoolName);
     bool start();
     bool acceptClients();
     bool clientHandler(int clientSocket);

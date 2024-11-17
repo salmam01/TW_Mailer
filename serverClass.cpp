@@ -1,7 +1,11 @@
 #include "serverClass.h"
 #include "serverHeaders.h"
 
-Server::Server(int port, std::string mailSpoolDir)
+using namespace std;
+using namespace filesystem;
+
+
+Server::Server(int port, string mailSpoolDirName)
 {
   //  AF_INET = IPv4
   memset(&this->serverAddress, 0, sizeof(this->serverAddress));
@@ -9,7 +13,18 @@ Server::Server(int port, std::string mailSpoolDir)
   this->serverAddress.sin_port = htons(port);
   this->serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-  this->mailSpoolDir = mailSpoolDir;
+  //  Create the Mail Spool Directory
+  path currentPath = current_path();
+  this->mailSpoolDir.name = mailSpoolDirName;
+
+  // Create the directory for mail spool, if it doesn't exist already
+  if (!create_directory(this->mailSpoolDir.name)) 
+  {
+    cerr << "Error creating directory: " << this->mailSpoolDir.name << endl;
+  }
+  //  Add the directory to the current path
+  currentPath /= this->mailSpoolDir.name;
+  this->mailSpoolDir.path = currentPath;
 } 
 
 bool Server::start()
@@ -17,7 +32,7 @@ bool Server::start()
   //  Create a new socket
   if((this->serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1)
   {
-    std::cerr << "Error while creating socket" << std::endl;
+    cerr << "Error while creating socket" << endl;
     return false;
   }
 
@@ -27,7 +42,7 @@ bool Server::start()
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
   {
-    std::cerr << "Set socket options - reuseAddr" << std::endl;
+    cerr << "Set socket options - reuseAddr" << endl;
     return false;
   }
 
@@ -37,17 +52,18 @@ bool Server::start()
                       &reuseValue,
                       sizeof(reuseValue)) == -1)
       {
-      std::cerr << "Set socket options - reusePort" << std::endl;
+      cerr << "Set socket options - reusePort" << endl;
       return false;
   }
 
-  std::cout << "Port: " << this->serverAddress.sin_port << std::endl;
-  std::cout << "Mail-Spool Directory: " << this->mailSpoolDir << std::endl;
+  cout << "Port: " << this->serverAddress.sin_port << endl;
+  cout << "Mail-Spool Directory Name: " << this->mailSpoolDir.name << endl;
+  cout << "Mail-Spool Directory Path: " << this->mailSpoolDir.path << endl;
 
   //  Binding socket
-  if(bind(this->serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
+  if(bind(this->serverSocket, (struct sockaddr*)&this->serverAddress, sizeof(this->serverAddress)) < 0)
   {
-    std::cerr << "Error while binding socket." << std::endl;
+    cerr << "Error while binding socket." << endl;
     close(this->serverSocket);
     return false;
   }
@@ -55,7 +71,7 @@ bool Server::start()
   //  Listen for incoming clients
   if(listen(this->serverSocket, 5) < 0)
   {
-    std::cerr << "Error while listening for clients." << std::endl;
+    cerr << "Error while listening for clients." << endl;
     close(this->serverSocket);
     return false;
   }
@@ -74,19 +90,19 @@ bool Server::acceptClients()
 {
   while(!abortRequested)
   {
-    std::cout << "Listening for client connections on port " << this->serverAddress.sin_port << std::endl;
+    cout << "Listening for client connections on port " << this->serverAddress.sin_port << endl;
     int clientSocket = accept(this->serverSocket, nullptr, nullptr);
     if (clientSocket >= 0) 
     {
       //  Create a thread for each client connection and pass the function and parameter
-      std::cout << "Client accepted." << std::endl;
-      std::thread clientThread(&Server::clientHandler, this, clientSocket);
+      cout << "Client accepted." << endl;
+      thread clientThread(&Server::clientHandler, this, clientSocket);
       //  Main thread continues executing without waiting for the clientThread
       clientThread.detach();
     }
     else 
     {
-      std::cerr << "Error accepting client connection." << std::endl;
+      cerr << "Error accepting client connection." << endl;
       return false;
     }
   }
@@ -97,18 +113,18 @@ bool Server::clientHandler(int clientSocket)
 {
   try
   {
-    std::string welcomeMessage = "Welcome to our Mail Server! Please login with LOGIN.\n";
+    string welcomeMessage = "Welcome to our Mail Server! Please login with LOGIN.\n";
     if (send(clientSocket, welcomeMessage.c_str(), strlen(welcomeMessage), 0) == -1)
     {
       // Close the socket on failure
-      std::cerr << "Send failed." << std::endl;
+      cerr << "Send failed." << endl;
       return false;
     }
 
-    std::string command = parser(clientSocket);
+    string command = parser(clientSocket);
     if(command.empty())
     {
-      std::cerr << "Command cannot be empty." << std::endl;
+      cerr << "Command cannot be empty." << endl;
       return false;
     }
 
@@ -117,28 +133,28 @@ bool Server::clientHandler(int clientSocket)
     return true;
 
   }
-  catch(const std::exception &e)
+  catch(const exception &e)
   {
-    std::cerr << "Exception in clientHandler: " << e.what() << std::endl;
+    cerr << "Exception in clientHandler: " << e.what() << endl;
     sendResponse(clientSocket, false);
     close(clientSocket);
   }
   catch(...)
   {
-    std::cerr << "An unknown error occurred. Connection will terminate." << std::endl;
+    cerr << "An unknown error occurred. Connection will terminate." << endl;
     sendResponse(clientSocket, false);
     close(clientSocket);
   }
 }
 
-std::string Server::parser(int clientSocket)
+string Server::parser(int clientSocket)
 {
   // Buffer reads the data, bytesRead determines the actual number of bytes read
   char buffer[BUFFER_SIZE];
   ssize_t bytesRead = 0;
-  std::string line;
+  string line;
 
-  // Read the data and save it into the receivedData string
+  // Read the data and save it into the buffer
   while (true)
   {
       // Clear the buffer and read up to buffer_size - 1 bytes
@@ -147,7 +163,7 @@ std::string Server::parser(int clientSocket)
 
       if (bytesRead <= 0)
       {
-          std::cerr << "Error while reading message body." << std::endl;
+          cerr << "Error while reading message body." << endl;
           close(clientSocket);
           return "";
       }
@@ -156,10 +172,10 @@ std::string Server::parser(int clientSocket)
       line += buffer; // Append buffer content to the line
 
       // Debug output
-      std::cout << "Received client input: " << buffer << std::endl;
+      cout << "Received client input: " << buffer << endl;
 
       // If a newline character is found, we have the full line
-      if (line.find("\n") != std::string::npos)
+      if (line.find("\n") != string::npos)
       {
           break;
       }
@@ -167,7 +183,7 @@ std::string Server::parser(int clientSocket)
 
   // Strip the newline character at the end, if present
   size_t pos = line.find("\n");
-  if (pos != std::string::npos)
+  if (pos != string::npos)
   {
       line = line.substr(0, pos);  // Remove the newline
   }
@@ -175,13 +191,13 @@ std::string Server::parser(int clientSocket)
   return line;
 }
 
-void Server::commandHandler(int clientSocket, std::string command)
+void Server::commandHandler(int clientSocket, string command)
 {
-  std::cout << "Received command: " << command << std::endl;
+  cout << "Received command: " << command << endl;
   
   if (command == "LOGIN")
   {
-    std::cout << "Handling LOGIN command" << std::endl;
+    cout << "Handling LOGIN command" << endl;
     if (loginHandler(clientSocket)) {
         sendResponse(clientSocket, true);  // OK LOGIN SUCCESSFUL
     } else {
@@ -190,7 +206,7 @@ void Server::commandHandler(int clientSocket, std::string command)
   }
   else if (command == "SEND")
   {
-    std::cout << "Handling SEND command" << std::endl;
+    cout << "Handling SEND command" << endl;
     if (sendHandler(clientSocket)) {
         sendResponse(clientSocket, true);  // OK MESSAGE SENT
     } else {
@@ -199,22 +215,22 @@ void Server::commandHandler(int clientSocket, std::string command)
   }
   else if (command == "LIST")
   {
-    std::cout << "Handling LIST command" << std::endl;
+    cout << "Handling LIST command" << endl;
     listHandler(clientSocket);
   }
   else if (command == "READ")
   {
-    std::cout << "Handling READ command" << std::endl;
+    cout << "Handling READ command" << endl;
     readHandler(clientSocket);
   }
   else if (command == "DEL")
   {
-    std::cout << "Handling DEL command" << std::endl;
+    cout << "Handling DEL command" << endl;
     delHandler(clientSocket);
   }
   else if (command == "QUIT")
   {
-    std::cout << "Handling QUIT command" << std::endl;
+    cout << "Handling QUIT command" << endl;
     sendResponse(clientSocket, true);  // OK CONNECTION CLOSED
     close(clientSocket);  // Close the connection after QUIT
   }
@@ -236,14 +252,14 @@ bool Server::loginHandler(int clientSocket)
   
   if (bytesRead <= 0)
   {
-    std::cerr << "Error reading username from client." << std::endl;
+    cerr << "Error reading username from client." << endl;
     return false;
   }
 
   // Null-terminate the string received from the client
   buffer[bytesRead] = '\0';
-  std::string username(buffer);
-  std::cout << "User entered: " << username << std::endl; // Log the username
+  string username(buffer);
+  cout << "User entered: " << username << endl; // Log the username
 
   // Read the password sent by the client
   memset(buffer, 0, sizeof(buffer)); // Clear the buffer
@@ -251,14 +267,14 @@ bool Server::loginHandler(int clientSocket)
   
   if (bytesRead <= 0)
   {
-    std::cerr << "Error reading password from client." << std::endl;
+    cerr << "Error reading password from client." << endl;
     return false;
   }
 
   // Null-terminate the string received from the client
   buffer[bytesRead] = '\0';
-  std::string password(buffer);
-  std::cout << "Password entered: " << password << std::endl; // Log the password
+  string password(buffer);
+  cout << "Password entered: " << password << endl; // Log the password
 
   // For testing
   return true;
@@ -276,30 +292,32 @@ SEND\n
 //  Ignore the fact that this is a bool for now, it will come in handy later
 bool Server::sendHandler(int clientSocket)
 {
-  std::vector<std::string> body = sendParser(clientSocket);
+  vector<string> body = sendParser(clientSocket);
   if(body.empty() || body.size() < 3)
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Invalid command syntax." << std::endl;
+    cerr << "Invalid SEND command syntax." << endl;
     return false;
   }
 
-  //  get the actual sender at some point, this just for testing
-  std::string sender = "if23b281";
-  std::string receiver = body[0];
-  std::string subject = body[1];
-  std::string message = body[2];
+  path path = 
 
-  std::fstream fout;
-  std::string mailSpoolName = sender + ".csv";
+  //  get the actual sender at some point, this just for testing
+  string sender = "if23b281";
+  string receiver = body[0];
+  string subject = body[1];
+  string message = body[2];
+
+  fstream fout;
+  string mailSpoolName = sender + ".csv";
 
   //  Open or create a new file with the name
-  fout.open(mailSpoolName, std::ios::out | std::ios::app);
+  fout.open(mailSpoolName, ios::out | ios::app);
   //  Check if the file was opened successfully
   if(!fout.is_open())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Error occurred while opening Mail-Spool file." << std::endl;
+    cerr << "Error occurred while opening Mail-Spool file." << endl;
     return false;
   }
   
@@ -313,7 +331,7 @@ bool Server::sendHandler(int clientSocket)
   if(fout.fail())
   {
     fout.close();
-    std::cerr << "Error writing to Mail-Spool file." << std::endl;
+    cerr << "Error writing to Mail-Spool file." << endl;
     sendResponse(clientSocket, false);
     return false;
   }
@@ -325,10 +343,10 @@ bool Server::sendHandler(int clientSocket)
 }
 
 //  ??? hopefully this shit works now
-std::vector<std::string> Server::sendParser(int clientSocket)
+vector<string> Server::sendParser(int clientSocket)
 {
-  std::vector<std::string> body;
-  std::string line;
+  vector<string> body;
+  string line;
 
   while(1)
   {
@@ -367,25 +385,25 @@ LIST\n
 void Server::listHandler(int clientSocket)
 {
   //  temporary
-  std::string sender = "if23b281";
-  std::fstream fin;
-  std::string mailSpoolName = sender + ".csv";
+  string sender = "if23b281";
+  fstream fin;
+  string mailSpoolName = sender + ".csv";
 
-  fin.open(mailSpoolName, std::ios::in);
+  fin.open(mailSpoolName, ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "File does not exist." << std::endl;
+    cerr << "File does not exist." << endl;
     return;
   }
 
-  std::string line;
-  std::vector<std::string> subjects;
+  string line;
+  vector<string> subjects;
   //  Loop until the end of the file
   while(getline(fin, line))
   {
-    std::stringstream ss(line);
-    std::string receiver, subject, message;
+    stringstream ss(line);
+    string receiver, subject, message;
 
     getline(ss, receiver, ';');
     getline(ss, subject, ';');
@@ -395,7 +413,7 @@ void Server::listHandler(int clientSocket)
   }
   fin.close();
   
-  std::string response = "Message Count: " + std::to_string(subjects.size()) + "\n";
+  string response = "Message Count: " + to_string(subjects.size()) + "\n";
 
   for(int i = 0; i < subjects.size(); i++)
   {
@@ -417,32 +435,32 @@ void Server::readHandler(int clientSocket)
   {
     messageNr = stoi(parser(clientSocket));
   }
-  catch(const std::exception& e)
+  catch(const exception& e)
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Message number has to be of integer type." << std::endl;
+    cerr << "Message number has to be of integer type." << endl;
     return;
   }
 
-  std::string sender = "if23b281";
-  std::fstream fin;
-  std::string mailSpoolName = sender + ".csv";
+  string sender = "if23b281";
+  fstream fin;
+  string mailSpoolName = sender + ".csv";
 
-  fin.open(mailSpoolName, std::ios::in);
+  fin.open(mailSpoolName, ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "File does not exist." << std::endl;
+    cerr << "File does not exist." << endl;
     return;
   }
 
-  std::string line;
-  std::string response;
+  string line;
+  string response;
   int count = 1;
   while(getline(fin, line))
   {
-    std::stringstream ss(line);
-    std::string receiver, subject, message;
+    stringstream ss(line);
+    string receiver, subject, message;
 
     getline(ss, receiver, ';');
     getline(ss, subject, ';');
@@ -460,7 +478,7 @@ void Server::readHandler(int clientSocket)
   if(response.empty())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Message does not exist." << std::endl;
+    cerr << "Message does not exist." << endl;
   }
   else
   {
@@ -475,44 +493,44 @@ DEL\n
 // Copy the file contents without the specified line into a temporary file and replace the original file
 void Server::delHandler(int clientSocket)
 {
-  std::string sender = "if23b281";
+  string sender = "if23b281";
   int messageNr;
   try
   {
     messageNr = stoi(parser(clientSocket));
   }
-  catch(const std::exception& e)
+  catch(const exception& e)
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Message number has to be of integer type." << std::endl;
-    std::cerr << "Error:" << e.what() << std::endl;
+    cerr << "Message number has to be of integer type." << endl;
+    cerr << "Error:" << e.what() << endl;
     return;
   }
 
   //fstream fin;
   //fstream tempFile;
   //  Should probably save the name somewhere atp...
-  std::string mailSpoolName = sender + ".csv";
-  std::string tempFileName = sender + "Temp.csv";
+  string mailSpoolName = sender + ".csv";
+  string tempFileName = sender + "Temp.csv";
 
-  std::fstream fin(mailSpoolName, std::ios::in);
+  fstream fin(mailSpoolName, ios::in);
   if(!fin.is_open())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "File does not exist." << std::endl;
+    cerr << "File does not exist." << endl;
     return;
   }
 
-  std::fstream tempFile(tempFileName, std::ios::out);
+  fstream tempFile(tempFileName, ios::out);
   if(!tempFile.is_open())
   {
     sendResponse(clientSocket, false);
-    std::cerr << "Error while opening temporary file for writing." << std::endl;
+    cerr << "Error while opening temporary file for writing." << endl;
     fin.close();
     return;
   }
 
-  std::string line;
+  string line;
   int count = 1;
   bool fileFound = false;
 
@@ -538,7 +556,7 @@ void Server::delHandler(int clientSocket)
   {
     if (remove(mailSpoolName.c_str()) != 0 || rename(tempFileName.c_str(), mailSpoolName.c_str()) != 0) {
         sendResponse(clientSocket, false);
-        std::cerr << "Error updating the mail file." << std::endl;
+        cerr << "Error updating the mail file." << endl;
         return;
     }
     sendResponse(clientSocket, true);
@@ -547,7 +565,7 @@ void Server::delHandler(int clientSocket)
   {
     remove(tempFileName.c_str());
     sendResponse(clientSocket, false);
-    std::cerr << "Message number not found." << std::endl;
+    cerr << "Message number not found." << endl;
   }
 }
 
@@ -564,7 +582,7 @@ void Server::sendResponse(int clientSocket, bool state)
   }
 }
 
-bool Server::establishLDAPConnection(const std::string& bindPassword)
+bool Server::establishLDAPConnection(const string& bindPassword)
 {
     LDAP* ldapHandle;
     int result;
@@ -573,21 +591,21 @@ bool Server::establishLDAPConnection(const std::string& bindPassword)
     result = ldap_initialize(&ldapHandle, ldapServer);
     if (result != LDAP_SUCCESS)
     {
-        std::cerr << "Failed to initialize LDAP connection: " << ldap_err2string(result) << std::endl;
+        cerr << "Failed to initialize LDAP connection: " << ldap_err2string(result) << endl;
         return false;
     }
-    std::cout << "LDAP connection initialized successfully." << std::endl;
+    cout << "LDAP connection initialized successfully." << endl;
 
     // Set LDAP options (optional but recommended)
     int protocolVersion = LDAP_VERSION3;
     result = ldap_set_option(ldapHandle, LDAP_OPT_PROTOCOL_VERSION, &protocolVersion);
     if (result != LDAP_SUCCESS)
     {
-        std::cerr << "Failed to set LDAP protocol version: " << ldap_err2string(result) << std::endl;
+        cerr << "Failed to set LDAP protocol version: " << ldap_err2string(result) << endl;
         ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
         return false;
     }
-    std::cout << "LDAP protocol version set to 3." << std::endl;
+    cout << "LDAP protocol version set to 3." << endl;
 
     // Bind to the LDAP server using the class member ldapBind
     BerValue bindCredentials;
@@ -599,11 +617,11 @@ bool Server::establishLDAPConnection(const std::string& bindPassword)
 
     if (result != LDAP_SUCCESS)
     {
-        std::cerr << "LDAP bind failed: " << ldap_err2string(result) << std::endl;
+        cerr << "LDAP bind failed: " << ldap_err2string(result) << endl;
         ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
         return false;
     }
-    std::cout << "LDAP bind successful." << std::endl;
+    cout << "LDAP bind successful." << endl;
 
     // Connection is established successfully
     ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
