@@ -56,7 +56,7 @@ bool Server::start()
     return false;
   }
 
-  cout << "Port: " << this->serverAddress.sin_port << endl;
+  cout << "Port: " << ntohs(this->serverAddress.sin_port) << endl;
   cout << "Mail-Spool Directory Name: " << this->mailSpoolDir.name << endl;
   cout << "Mail-Spool Directory Path: " << this->mailSpoolDir.path << endl;
 
@@ -88,7 +88,7 @@ void Server::acceptClients()
 {
   while(!abortRequested)
   {
-    cout << "Listening for client connections on port " << this->serverAddress.sin_port << endl;
+    cout << "Listening for client connections on port " << ntohs(this->serverAddress.sin_port) << endl;
     int clientSocket = accept(this->serverSocket, nullptr, nullptr);
     if (clientSocket >= 0) 
     {
@@ -445,11 +445,15 @@ void Server::listHandler(int clientSocket)
   
   string response = "Message Count: " + to_string(subjects.size()) + "\n";
 
-  for(int i = 0; i < subjects.size(); i++)
+  /*for(int i = 0; i < subjects.size(); i++)
   {
     response += subjects[i] + "\n";
-  }
+  }*/
 
+  for (const auto& subject : subjects) 
+  {
+      response += subject + "\n";
+  }
   send(clientSocket, response.c_str(), response.size(), 0);
 }
 
