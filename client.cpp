@@ -132,11 +132,12 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    client.receive_data();
+    client.receive_data();  // Read initial data or welcome message
 
     bool isQuit = false;
     do
     {
+        // Print the prompt to get user command
         printf(">> ");
         string command;
         getline(cin, command);
@@ -191,34 +192,31 @@ int main(int argc, char **argv)
             continue;
         }
 
+        // Process the server's response
         if (!isQuit)
         {
-            while (true)
+            int size = recv(client.get_socket_fd(), client.get_buffer(), BUFFER_SIZE - 1, 0);
+            if (size == -1)
             {
-                int size = recv(client.get_socket_fd(), client.get_buffer(), BUFFER_SIZE - 1, 0);
-                if (size == -1)
-                {
-                    perror("recv error");
-                    break;
-                }
-                else if (size == 0)
-                {
-                    printf("Server closed remote socket\n");
-                    break;
-                }
-                else
-                {
-                    client.get_buffer()[size] = '\0';
-                    printf("%s\n", client.get_buffer());
+                perror("recv error");
+                break;
+            }
+            else if (size == 0)
+            {
+                printf("Server closed remote socket\n");
+                break;
+            }
+            else
+            {
+                client.get_buffer()[size] = '\0';
+                printf("%s\n", client.get_buffer());
 
-                    // Check for specific responses
-                    if (strstr(client.get_buffer(), "<< OK") ||
-                        strstr(client.get_buffer(), "<< ERR") ||
-                        strstr(client.get_buffer(), "<< LOGIN FIRST"))
-                    {
-                        memset(client.get_buffer(), 0, BUFFER_SIZE);
-                        break;
-                    }
+                // Handle server response like << OK or << ERR
+                if (strstr(client.get_buffer(), "<< OK") ||
+                    strstr(client.get_buffer(), "<< ERR") ||
+                    strstr(client.get_buffer(), "<< LOGIN FIRST"))
+                {
+                    memset(client.get_buffer(), 0, BUFFER_SIZE);  // Clear buffer for next command
                 }
             }
         }
@@ -229,3 +227,5 @@ int main(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
+
+
