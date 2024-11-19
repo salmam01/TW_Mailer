@@ -16,6 +16,8 @@
 #include <netinet/in.h>
 //  close function
 #include <unistd.h>
+//  for receiving signals in the main process
+#include <signal.h>
 
 //  std::filesystem for file and directory operations
 #include <filesystem>

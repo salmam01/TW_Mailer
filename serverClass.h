@@ -21,9 +21,9 @@ class Server
     std::vector<std::thread> activeThreads;
     std::vector<std::string> blackList;
     std::mutex threadsMutex;
+    bool abortRequested = false;
     int serverSocket = -1;
     int reuseValue = 1;
-    bool abortRequested = false;
     const int maxLoginAttempts = 3;
     int loginAttempts = 0;
     std::string currentUser ="";
@@ -33,6 +33,7 @@ class Server
   public:
     Server(int port, std::string mailSpoolName);
     bool start();
+    void shutdown();
     void acceptClients();
     void cleanUpThreads();
     void clientHandler(int clientSocket);

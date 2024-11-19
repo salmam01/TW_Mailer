@@ -22,6 +22,11 @@ Server::Server(int port, string mailSpoolDirName)
   }
 } 
 
+void Server::shutdown()
+{
+  this->abortRequested = true;
+}
+
 bool Server::start()
 {
   //  Create a new socket
@@ -57,7 +62,7 @@ bool Server::start()
   cout << "Mail-Spool Directory Name: " << this->mailSpoolDir.name << endl;
   cout << "Mail-Spool Directory Path: " << this->mailSpoolDir.path << endl;
 
-  //  Binding socket
+  //  Check binding socket for errors
   if(bind(this->serverSocket, (struct sockaddr*)&this->serverAddress, sizeof(this->serverAddress)) < 0)
   {
     cerr << "Error while binding socket." << endl;
@@ -65,7 +70,7 @@ bool Server::start()
     return false;
   }
 
-  //  Listen for incoming clients
+  //  Check listen for incoming clients and errors
   if(listen(this->serverSocket, 5) < 0)
   {
     cerr << "Error while listening for clients." << endl;
@@ -75,12 +80,10 @@ bool Server::start()
 
   //  Accept clients
   acceptClients();
-  
-  close(this->serverSocket);
   return true;
 }
 
-//  Function that can accept clients until the server is closed
+//  Function that accepts clients until the server is shut down
 void Server::acceptClients()
 {
   while(!abortRequested)
@@ -108,11 +111,13 @@ void Server::acceptClients()
   }
 
   cleanUpThreads();
+  close(this->serverSocket);
 }
 
 //  Helper function for acceptclient that joins all finished threads 
 void Server::cleanUpThreads()
 {
+  //  Critical section
   lock_guard<mutex> lockMutex(this->threadsMutex);
 
   for(auto &thread : this->activeThreads)
