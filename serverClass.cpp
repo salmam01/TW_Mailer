@@ -144,18 +144,30 @@ void Server::clientHandler(int clientSocket)
       cerr << "Send failed." << endl;
       return;
     }
-
-    string command = parser(clientSocket);
-    cout << "Do u ever exit?" << endl;
-    if(!command.empty())
+    
+    while(true)
     {
-      commandHandler(clientSocket, command);
-    }
-    else
-    {
-      cerr << "Command cannot be empty." << endl;
-      return;
-    }
+      cout << "Awaiting client request ..." << endl;
+      string command = parser(clientSocket);
+      if(!command.empty())
+      {
+        if(command == "QUIT")
+        {
+          cout << "Client has closed the connection." << endl;
+          close(clientSocket);
+          return;
+        }
+        else
+        {
+          commandHandler(clientSocket, command);
+        }
+      }
+      else
+      {
+        cerr << "Command cannot be empty." << endl;
+        continue;
+      }
+    }   
   }
   catch(const exception &e)
   {
@@ -171,7 +183,6 @@ void Server::clientHandler(int clientSocket)
     close(clientSocket);
     return;
   }
-  close(clientSocket);
 }
 
 string Server::parser(int clientSocket)
@@ -179,7 +190,6 @@ string Server::parser(int clientSocket)
   // Buffer reads the data, bytesRead determines the actual number of bytes read
   char buffer[BUFFER_SIZE];
   ssize_t bytesRead = 0;
-  stringstream lineStream;
   string line;
 
   // Read the data and save it into the buffer
@@ -192,7 +202,7 @@ string Server::parser(int clientSocket)
     if (bytesRead == 0)
     {
       cerr << "Client closed the connection." << endl;
-      return lineStream.str();
+      return "";
     }
     if (bytesRead < 0)
     {
@@ -200,10 +210,11 @@ string Server::parser(int clientSocket)
       return "";
     }
 
+    
     buffer[bytesRead] = '\0';
-    lineStream.write(buffer, bytesRead);
+    stringstream lineStream(buffer);
+    //lineStream.write(buffer, bytesRead);
 
-    // Debug output
     cout << "Received client input: " << buffer << endl;
     
     if(getline(lineStream, line, '\n'))
@@ -361,9 +372,14 @@ void Server::sendHandler(int clientSocket)
 
   //  get the actual sender at some point, this just for testing
   string sender = "if23b281";
+  
   string receiver = body[0];
   string subject = body[1];
   string message = body[2];
+
+  cout << "Receiver: " << receiver << endl;
+  cout << "Subject: " << subject << endl;
+  cout << "Message: " << message << endl;
 
   fstream fout;
   //  Save the new file name as sender.csv inside the Mail Spool Directory location
