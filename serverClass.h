@@ -19,6 +19,7 @@ class Server
     MailSpoolDir mailSpoolDir;
     sockaddr_in serverAddress;
     std::vector<std::thread> activeThreads;
+    std::vector<std::string> blackList;
     std::mutex threadsMutex;
     int serverSocket = -1;
     int reuseValue = 1;

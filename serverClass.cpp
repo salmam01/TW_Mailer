@@ -51,7 +51,8 @@ bool Server::start()
     cerr << "Set socket options - reusePort" << endl;
     return false;
   }
-
+  
+  cout << "Server start was successful." << endl;
   cout << "Port: " << ntohs(this->serverAddress.sin_port) << endl;
   cout << "Mail-Spool Directory Name: " << this->mailSpoolDir.name << endl;
   cout << "Mail-Spool Directory Path: " << this->mailSpoolDir.path << endl;
@@ -160,6 +161,7 @@ void Server::clientHandler(int clientSocket)
     close(clientSocket);
     return;
   }
+  close(clientSocket);
 }
 
 string Server::parser(int clientSocket)
@@ -179,7 +181,6 @@ string Server::parser(int clientSocket)
       if (bytesRead <= 0)
       {
           cerr << "Error while reading message body." << endl;
-          close(clientSocket);
           return "";
       }
 
