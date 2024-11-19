@@ -33,7 +33,7 @@ class Server
   public:
     Server(int port, std::string mailSpoolName);
     bool start();
-    void shutdown();
+    void shutDown();
     void acceptClients();
     void cleanUpThreads();
     void clientHandler(int clientSocket);

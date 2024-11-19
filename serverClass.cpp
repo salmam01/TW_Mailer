@@ -22,9 +22,12 @@ Server::Server(int port, string mailSpoolDirName)
   }
 } 
 
-void Server::shutdown()
+void Server::shutDown()
 {
+  cerr << "Shutting down server..." << endl;
   this->abortRequested = true;
+  shutdown(this->serverSocket, SHUT_RDWR);
+  close(this->serverSocket);
 }
 
 bool Server::start()
@@ -37,21 +40,21 @@ bool Server::start()
   }
 
   //  Set socket options 
-  if (setsockopt(this->serverSocket,
-                      SOL_SOCKET,
-                      SO_REUSEADDR,
-                      &reuseValue,
-                      sizeof(reuseValue)) == -1)
+  if (setsockopt( this->serverSocket,
+                  SOL_SOCKET,
+                  SO_REUSEADDR,
+                  &reuseValue,
+                  sizeof(reuseValue)) == -1)
   {
     cerr << "Set socket options - reuseAddr" << endl;
     return false;
   }
 
-  if (setsockopt(this->serverSocket,
-                      SOL_SOCKET,
-                      SO_REUSEPORT,
-                      &reuseValue,
-                      sizeof(reuseValue)) == -1)
+  if (setsockopt( this->serverSocket,
+                  SOL_SOCKET,
+                  SO_REUSEPORT,
+                  &reuseValue,
+                  sizeof(reuseValue)) == -1)
   {
     cerr << "Set socket options - reusePort" << endl;
     return false;
@@ -80,6 +83,8 @@ bool Server::start()
 
   //  Accept clients
   acceptClients();
+
+  close(this->serverSocket);
   return true;
 }
 
@@ -111,7 +116,6 @@ void Server::acceptClients()
   }
 
   cleanUpThreads();
-  close(this->serverSocket);
 }
 
 //  Helper function for acceptclient that joins all finished threads 
@@ -142,6 +146,7 @@ void Server::clientHandler(int clientSocket)
     }
 
     string command = parser(clientSocket);
+    cout << "Do u ever exit?" << endl;
     if(!command.empty())
     {
       commandHandler(clientSocket, command);
@@ -179,36 +184,36 @@ string Server::parser(int clientSocket)
   // Read the data and save it into the buffer
   while (true)
   {
-      // Clear the buffer and read up to buffer_size - 1 bytes
-      memset(buffer, 0, BUFFER_SIZE);
-      bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
+    // Clear the buffer
+    memset(buffer, 0, BUFFER_SIZE);
+    bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
 
-      if (bytesRead <= 0)
-      {
-          cerr << "Error while reading message body." << endl;
-          return "";
-      }
+    if (bytesRead == 0)
+    {
+      cerr << "Client closed the connection." << endl;
+      return line;
+    }
+    if (bytesRead < 0)
+    {
+      cerr << "Error while reading message body." << endl;
+      return "";
+    }
 
-      buffer[bytesRead] = '\0'; // Null terminate the buffer
-      line += buffer; // Append buffer content to the line
+    buffer[bytesRead] = '\0';
+    line += buffer;
 
-      // Debug output
-      cout << "Received client input: " << buffer << endl;
+    // Debug output
+    cout << "Received client input: " << buffer << endl;
 
-      // If a newline character is found, we have the full line
-      if (line.find("\n") != string::npos)
-      {
-          break;
-      }
+    // Check if the accumulated line contains a newline
+    size_t newlinePos = line.find('\n');
+    if (newlinePos != string::npos)
+    {
+        // Trim the newline character and return the result
+        line = line.substr(0, newlinePos);
+        break;
+    }
   }
-
-  // Strip the newline character at the end, if present
-  size_t pos = line.find("\n");
-  if (pos != string::npos)
-  {
-      line = line.substr(0, pos);  // Remove the newline
-  }
-
   return line;
 }
 

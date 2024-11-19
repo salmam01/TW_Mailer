@@ -16,11 +16,15 @@ void printUsage()
 
 void signalHandler(int sig)
 {
-  if(serverPtr != nullptr)
+  if(sig == SIGINT)
   {
-    cout << "Shutting down server..." << endl;
-    serverPtr->shutdown();
+    if(serverPtr != nullptr)
+    {
+      cerr << "Shutdown Requested" << endl;
+      serverPtr->shutDown();
+    }
   }
+  
 }
 
 int main(int argc, char *argv[])
@@ -50,8 +54,10 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  signal(SIGINT, signalHandler);
-  signal(SIGTERM, signalHandler);
+  if(signal(SIGINT, signalHandler) == SIG_ERR)
+  {
+    cerr << "Error registering signal." << endl;
+  }
 
   return EXIT_SUCCESS;
 }
