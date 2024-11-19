@@ -3,6 +3,7 @@
 
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 50
+#define SENDER "if23b280"
 
 #include "serverHeaders.h"
 

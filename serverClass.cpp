@@ -371,7 +371,7 @@ void Server::sendHandler(int clientSocket)
   }
 
   //  get the actual sender at some point, this just for testing
-  string sender = "if23b281";
+  string sender = SENDER;
   
   string receiver = body[0];
   string subject = body[1];
@@ -456,7 +456,7 @@ vector<string> Server::sendParser(int clientSocket)
 void Server::listHandler(int clientSocket)
 {
   //  temporary
-  string sender = "if23b281";
+  string sender = SENDER;
   fstream fin;
   string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
 
@@ -515,7 +515,7 @@ void Server::readHandler(int clientSocket)
     return;
   }
 
-  string sender = "if23b281";
+  string sender = SENDER;
   fstream fin;
   string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
 
