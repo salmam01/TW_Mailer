@@ -15,15 +15,11 @@ Server::Server(int port, string mailSpoolDirName)
   //  Create the Mail Spool Directory
   path currentPath = current_path();
   this->mailSpoolDir.name = mailSpoolDirName;
-
-  // Create the directory for mail spool, if it doesn't exist already
-  if (!create_directory(this->mailSpoolDir.name)) 
+  this->mailSpoolDir.path = currentPath /= this->mailSpoolDir.name;
+  if(!exists(this->mailSpoolDir.path))
   {
-    cerr << "Error creating directory: " << this->mailSpoolDir.name << endl;
+    create_directory(this->mailSpoolDir.path);
   }
-  //  Add the directory to the current path
-  currentPath /= this->mailSpoolDir.name;
-  this->mailSpoolDir.path = currentPath;
 } 
 
 bool Server::start()
@@ -83,7 +79,7 @@ bool Server::start()
   return true;
 }
 
-//  Function that can accept up to 5 clients simultaneously until the server is closed manually
+//  Function that can accept clients until the server is closed
 void Server::acceptClients()
 {
   while(!abortRequested)
@@ -95,15 +91,37 @@ void Server::acceptClients()
       //  Create a thread for each client connection and pass the function and parameter
       cout << "Client accepted." << endl;
       thread clientThread(&Server::clientHandler, this, clientSocket);
-      //  Main thread continues executing without waiting for the clientThread
-      clientThread.detach();
+
+      this->threadsMutex.lock();
+      //  Move threads into the vector
+      this->activeThreads.push_back(move(clientThread));
+      this->threadsMutex.unlock();
     }
     else 
     {
       cerr << "Error accepting client connection: " << strerror(errno) << endl;
       continue;
     }
+
+    cleanUpThreads();
   }
+
+  cleanUpThreads();
+}
+
+//  Helper function for acceptclient that joins all finished threads 
+void Server::cleanUpThreads()
+{
+  lock_guard<mutex> lockMutex(this->threadsMutex);
+
+  for(auto &thread : this->activeThreads)
+  {
+    if(thread.joinable())
+    {
+      thread.join();
+    }
+  }
+  this->activeThreads.clear();
 }
 
 void Server::clientHandler(int clientSocket)
@@ -444,11 +462,6 @@ void Server::listHandler(int clientSocket)
   fin.close();
   
   string response = "Message Count: " + to_string(subjects.size()) + "\n";
-
-  /*for(int i = 0; i < subjects.size(); i++)
-  {
-    response += subjects[i] + "\n";
-  }*/
 
   for (const auto& subject : subjects) 
   {

@@ -2,7 +2,7 @@
 #define SERVER_CLASS_H
 
 #define BUFFER_SIZE 1024
-//#define MAIL_SPOOL_DIR "/mail_spool" --> not sure if we need it
+#define MAX_CLIENTS 50
 
 #include "serverHeaders.h"
 
@@ -17,6 +17,9 @@ class Server
     };
 
     MailSpoolDir mailSpoolDir;
+    sockaddr_in serverAddress;
+    std::vector<std::thread> activeThreads;
+    std::mutex threadsMutex;
     int serverSocket = -1;
     int reuseValue = 1;
     bool abortRequested = false;
@@ -25,12 +28,12 @@ class Server
     std::string currentUser ="";
     const char *ldapServer = "ldap://ldap.technikum-wien.at:389";
     const char *ldapBind = "ou=people,dc=technikum-wien,dc=at";
-    sockaddr_in serverAddress;
 
   public:
     Server(int port, std::string mailSpoolName);
     bool start();
     void acceptClients();
+    void cleanUpThreads();
     void clientHandler(int clientSocket);
     std::string parser(int clientSocket);
     void commandHandler(int clientSocket, std::string command);

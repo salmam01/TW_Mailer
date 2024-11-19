@@ -24,6 +24,8 @@
 
 //  for creating threads and concurrency
 #include <thread>
+//  for creating mutex and managing thread synchronization
+#include <mutex>
 
 //  try-catch block and exception handling
 #include <exception>
