@@ -24,7 +24,6 @@ void signalHandler(int sig)
       serverPtr->shutDown();
     }
   }
-  
 }
 
 int main(int argc, char *argv[])

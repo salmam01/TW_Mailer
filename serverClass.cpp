@@ -151,7 +151,11 @@ void Server::clientHandler(int clientSocket)
       string command = parser(clientSocket);
       if(!command.empty())
       {
-        if(command == "QUIT")
+        if(command == "LOGIN")
+        {
+          loginHandler(clientSocket);
+        }
+        else if(command == "QUIT")
         {
           cout << "Client has closed the connection." << endl;
           close(clientSocket);
@@ -159,7 +163,15 @@ void Server::clientHandler(int clientSocket)
         }
         else
         {
-          commandHandler(clientSocket, command);
+          if(isLoggedIn)
+          {
+            commandHandler(clientSocket, command);
+          }
+          else
+          {
+            cerr << "You have to be logged in to access other commands." << endl;
+            cerr << "Type LOGIN to proceed." << endl;
+          }
         }
       }
       else
@@ -224,23 +236,90 @@ string Server::parser(int clientSocket)
   }
 }
 
+bool Server::loginHandler(int clientSocket)
+{
+  string username = parser(clientSocket);
+  cout << "Username works." << endl;
+  string password = parser(clientSocket);
+  cout << "Username and password work." << endl;
+  
+  if (establishLDAPConnection(username, password))
+  {
+    cout << "Client logged in successfully" << endl;
+    sendResponse(clientSocket, true);
+    threadsMutex.lock();
+    isLoggedIn = true;
+    threadsMutex.unlock();
+    return true;
+  }
+  else
+  {
+    cerr << "LDAP authentication failed for user: " << username << endl;
+    sendResponse(clientSocket, false);
+    return false;
+  }
+}
+
+bool Server::establishLDAPConnection(const string& username, const string& password)
+{
+  LDAP* ldapHandle;
+  int result;
+
+  // Initialize LDAP connection
+  result = ldap_initialize(&ldapHandle, ldapServer);
+  if (result != LDAP_SUCCESS)
+  {
+    cerr << "Failed to initialize LDAP connection: " << ldap_err2string(result) << endl;
+    return false;
+  }
+  cout << "LDAP connection initialized successfully." << endl;
+
+  // Set the LDAP protocol version to 3 (recommended)
+  int protocolVersion = LDAP_VERSION3;
+  result = ldap_set_option(ldapHandle, LDAP_OPT_PROTOCOL_VERSION, &protocolVersion);
+  if (result != LDAP_SUCCESS)
+  {
+    cerr << "Failed to set LDAP protocol version: " << ldap_err2string(result) << endl;
+    ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+    return false;
+  }
+  cout << "LDAP protocol version set to 3." << endl;
+
+  // Construct the DN (Distinguished Name) for binding
+  string bindDN = "uid=" + username + "," + ldapBind;  // Construct the DN based on the username and base DN
+  BerValue bindCredentials;
+  bindCredentials.bv_val = const_cast<char*>(password.c_str());
+  bindCredentials.bv_len = password.length();
+  cout << "idk" << endl;
+
+  // Attempt to bind with the provided credentials
+  result = ldap_sasl_bind_s(ldapHandle, bindDN.c_str(), LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, nullptr);
+
+  if (result != LDAP_SUCCESS)
+  {
+    cerr << "LDAP bind failed: " << ldap_err2string(result) << endl;
+    ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+    return false;
+  }
+
+  cout << "LDAP bind successful." << endl;
+
+  // Unbind from the server after authentication
+  ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+  return true;
+}
+
 //  Function that handles each command 
 void Server::commandHandler(int clientSocket, string command)
 {
   cout << "Received command: " << command << endl;
-  
-  if (command == "LOGIN")
+  if(!isLoggedIn)
   {
-    cout << "Handling LOGIN command." << endl;
-    if (loginHandler(clientSocket)) 
-    {
-      sendResponse(clientSocket, true);
-    } else 
-    {
-      sendResponse(clientSocket, false);
-    }
+    cout << "Fuck you!" << endl;
+    sendResponse(clientSocket, false);
+    return;
   }
-  else if (command == "SEND")
+  if (command == "SEND")
   {
     cout << "Handling SEND command." << endl;
     sendHandler(clientSocket); 
@@ -273,102 +352,6 @@ void Server::commandHandler(int clientSocket, string command)
     cerr << "Invalid Command." << endl;
   }
 }
-
-bool Server::loginHandler(int clientSocket)
-{
-  char buffer[1024];
-  ssize_t bytesRead;
-
-  // Read the username sent by the client
-  memset(buffer, 0, sizeof(buffer)); // Clear the buffer
-  bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-  
-  if (bytesRead <= 0)
-  {
-    cerr << "Error reading username from client." << endl;
-    return false;
-  }
-
-  // Null-terminate the string received from the client
-  buffer[bytesRead] = '\0';
-  string username(buffer);
-  cout << "User entered: " << username << endl; // Log the username
-
-  // Read the password sent by the client
-  memset(buffer, 0, sizeof(buffer)); // Clear the buffer
-  bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-  
-  if (bytesRead <= 0)
-  {
-    cerr << "Error reading password from client." << endl;
-    return false;
-  }
-
-  // Null-terminate the string received from the client
-  buffer[bytesRead] = '\0';
-  string password(buffer);
-
-if (establishLDAPConnection(username, password))
-    {
-        sendResponse(clientSocket, true);
-        return true;
-    }
-    else
-    {
-        cerr << "LDAP authentication failed for user: " << username << endl;
-        sendResponse(clientSocket, false);
-        return false;
-    }
-}
-
-bool Server::establishLDAPConnection(const std::string& username, const std::string& password)
-{
-    LDAP* ldapHandle;
-    int result;
-
-    // Initialize LDAP connection
-    result = ldap_initialize(&ldapHandle, ldapServer);
-    if (result != LDAP_SUCCESS)
-    {
-        cerr << "Failed to initialize LDAP connection: " << ldap_err2string(result) << endl;
-        return false;
-    }
-    cout << "LDAP connection initialized successfully." << endl;
-
-    // Set the LDAP protocol version to 3 (recommended)
-    int protocolVersion = LDAP_VERSION3;
-    result = ldap_set_option(ldapHandle, LDAP_OPT_PROTOCOL_VERSION, &protocolVersion);
-    if (result != LDAP_SUCCESS)
-    {
-        cerr << "Failed to set LDAP protocol version: " << ldap_err2string(result) << endl;
-        ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
-        return false;
-    }
-    cout << "LDAP protocol version set to 3." << endl;
-
-    // Construct the DN (Distinguished Name) for binding
-    std::string bindDN = "uid=" + username + "," + ldapBind;  // Construct the DN based on the username and base DN
-    BerValue bindCredentials;
-    bindCredentials.bv_val = const_cast<char*>(password.c_str());
-    bindCredentials.bv_len = password.length();
-
-    // Attempt to bind with the provided credentials
-    result = ldap_sasl_bind_s(ldapHandle, bindDN.c_str(), LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, nullptr);
-
-    if (result != LDAP_SUCCESS)
-    {
-        cerr << "LDAP bind failed: " << ldap_err2string(result) << endl;
-        ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
-        return false;
-    }
-
-    cout << "LDAP bind successful." << endl;
-
-    // Unbind from the server after authentication
-    ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
-    return true;
-}
-
 
 //  Function to save a sent message inside a csv file
 void Server::sendHandler(int clientSocket)

@@ -114,78 +114,50 @@ int specificMessage(int socket){
    return 1;
 }
 
-int getch()
-{
-    int ch;
-    // https://man7.org/linux/man-pages/man3/termios.3.html
-    struct termios t_old, t_new;
+int getch() {
+   int ch;
+   struct termios t_old, t_new;
 
-    // https://man7.org/linux/man-pages/man3/termios.3.html
-    // tcgetattr() gets the parameters associated with the object referred
-    //   by fd and stores them in the termios structure referenced by
-    //   termios_p
-    tcgetattr(STDIN_FILENO, &t_old);
-    
-    // copy old to new to have a base for setting c_lflags
-    t_new = t_old;
+   // Get the current terminal attributes
+   tcgetattr(STDIN_FILENO, &t_old);
+   t_new = t_old;
 
-    // https://man7.org/linux/man-pages/man3/termios.3.html
-    //
-    // ICANON Enable canonical mode (described below).
-    //   * Input is made available line by line (max 4096 chars).
-    //   * In noncanonical mode input is available immediately.
-    //
-    // ECHO   Echo input characters.
-    t_new.c_lflag &= ~(ICANON | ECHO);
-    
-    // sets the attributes
-    // TCSANOW: the change occurs immediately.
-    tcsetattr(STDIN_FILENO, TCSANOW, &t_new);
+   // Disable canonical mode and echoing
+   t_new.c_lflag &= ~(ICANON | ECHO);
 
-    ch = getchar();
+   // Apply the new terminal settings
+   tcsetattr(STDIN_FILENO, TCSANOW, &t_new);
 
-    // reset stored attributes
-    tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
+   // Read a single character
+   ch = getchar();
 
-    return ch;
+   // Restore the original terminal settings
+   tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
+
+   return ch;
 }
 
-const char *getpass()
-{
-    int show_asterisk = 0;
+string getpass() {
+   const char BACKSPACE = 127;
+   const char RETURN = 10;
 
-    const char BACKSPACE = 127;
-    const char RETURN = 10;
+   unsigned char ch = 0;
+   string password;
 
-    unsigned char ch = 0;
-    std::string password;
+   cout << "Password: ";
 
-    printf("Password: ");
+   while ((ch = getch()) != RETURN) {
+      if (ch == BACKSPACE) {
+         if (!password.empty()) {
+               password.pop_back();
+         }
+      } else {
+         password += ch;
+      }
+   }
 
-    while ((ch = getch()) != RETURN)
-    {
-        if (ch == BACKSPACE)
-        {
-            if (password.length() != 0)
-            {
-                if (show_asterisk)
-                {
-                    printf("\b \b"); // backslash: \b
-                }
-                password.resize(password.length() - 1);
-            }
-        }
-        else
-        {
-            password += ch;
-            if (show_asterisk)
-            {
-                printf("*");
-            }
-        }
-    }
-    printf("\n");
-    return password.c_str();
+   cout << endl;
+   return password;
 }
 
 int loginCommand(int socket){
@@ -206,7 +178,11 @@ int loginCommand(int socket){
          return -1;
       }
 
-   getpass();
+   password = getpass();
+   if ((send(socket, password.c_str(), password.size(), 0)) == -1) {
+      perror("send error");
+      return -1;
+   }
 
    return 1;
 }

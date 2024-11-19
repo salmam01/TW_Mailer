@@ -25,6 +25,7 @@ class Server
     bool abortRequested = false;
     int serverSocket = -1;
     int reuseValue = 1;
+    bool isLoggedIn = false;
     const int maxLoginAttempts = 3;
     int loginAttempts = 0;
     std::string currentUser ="";
