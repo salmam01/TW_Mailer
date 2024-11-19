@@ -47,7 +47,7 @@ class Server
     void readHandler(int clientSocket);
     void delHandler(int clientSocket);
     void sendResponse(int clientSocket, bool state);
-    bool establishLDAPConnection(const std::string& bindPassword);
+    bool establishLDAPConnection(const std::string& username, const std::string& password);
 };
 
 #endif // SERVER_CLASS_H

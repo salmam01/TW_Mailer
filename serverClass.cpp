@@ -307,18 +307,26 @@ bool Server::loginHandler(int clientSocket)
   // Null-terminate the string received from the client
   buffer[bytesRead] = '\0';
   string password(buffer);
-  cout << "Password entered: " << password << endl; // Log the password
 
-  // For testing
-  return true;
+if (establishLDAPConnection(username, password))
+    {
+        sendResponse(clientSocket, true);
+        return true;
+    }
+    else
+    {
+        cerr << "LDAP authentication failed for user: " << username << endl;
+        sendResponse(clientSocket, false);
+        return false;
+    }
 }
 
-bool Server::establishLDAPConnection(const string& bindPassword)
+bool Server::establishLDAPConnection(const std::string& username, const std::string& password)
 {
     LDAP* ldapHandle;
     int result;
 
-    // Initialize LDAP connection using the class member ldapServer
+    // Initialize LDAP connection
     result = ldap_initialize(&ldapHandle, ldapServer);
     if (result != LDAP_SUCCESS)
     {
@@ -327,7 +335,7 @@ bool Server::establishLDAPConnection(const string& bindPassword)
     }
     cout << "LDAP connection initialized successfully." << endl;
 
-    // Set LDAP options (optional but recommended)
+    // Set the LDAP protocol version to 3 (recommended)
     int protocolVersion = LDAP_VERSION3;
     result = ldap_set_option(ldapHandle, LDAP_OPT_PROTOCOL_VERSION, &protocolVersion);
     if (result != LDAP_SUCCESS)
@@ -338,13 +346,14 @@ bool Server::establishLDAPConnection(const string& bindPassword)
     }
     cout << "LDAP protocol version set to 3." << endl;
 
-    // Bind to the LDAP server using the class member ldapBind
+    // Construct the DN (Distinguished Name) for binding
+    std::string bindDN = "uid=" + username + "," + ldapBind;  // Construct the DN based on the username and base DN
     BerValue bindCredentials;
-    bindCredentials.bv_val = const_cast<char*>(bindPassword.c_str());
-    bindCredentials.bv_len = bindPassword.length();
+    bindCredentials.bv_val = const_cast<char*>(password.c_str());
+    bindCredentials.bv_len = password.length();
 
-    BerValue* serverCredentials = nullptr;
-    result = ldap_sasl_bind_s(ldapHandle, ldapBind, LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, &serverCredentials);
+    // Attempt to bind with the provided credentials
+    result = ldap_sasl_bind_s(ldapHandle, bindDN.c_str(), LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, nullptr);
 
     if (result != LDAP_SUCCESS)
     {
@@ -352,12 +361,14 @@ bool Server::establishLDAPConnection(const string& bindPassword)
         ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
         return false;
     }
+
     cout << "LDAP bind successful." << endl;
 
-    // Connection is established successfully
+    // Unbind from the server after authentication
     ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
     return true;
 }
+
 
 //  Function to save a sent message inside a csv file
 void Server::sendHandler(int clientSocket)
