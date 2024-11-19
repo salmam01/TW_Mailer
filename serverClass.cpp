@@ -561,7 +561,7 @@ void Server::readHandler(int clientSocket)
 // Function to delete a specific message
 void Server::delHandler(int clientSocket)
 {
-  string sender = "if23b281";
+  string sender = SENDER;
   int messageNr;
   try
   {
