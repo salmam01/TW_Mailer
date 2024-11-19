@@ -179,6 +179,7 @@ string Server::parser(int clientSocket)
   // Buffer reads the data, bytesRead determines the actual number of bytes read
   char buffer[BUFFER_SIZE];
   ssize_t bytesRead = 0;
+  stringstream lineStream;
   string line;
 
   // Read the data and save it into the buffer
@@ -191,7 +192,7 @@ string Server::parser(int clientSocket)
     if (bytesRead == 0)
     {
       cerr << "Client closed the connection." << endl;
-      return line;
+      return lineStream.str();
     }
     if (bytesRead < 0)
     {
@@ -200,21 +201,16 @@ string Server::parser(int clientSocket)
     }
 
     buffer[bytesRead] = '\0';
-    line += buffer;
+    lineStream.write(buffer, bytesRead);
 
     // Debug output
     cout << "Received client input: " << buffer << endl;
-
-    // Check if the accumulated line contains a newline
-    size_t newlinePos = line.find('\n');
-    if (newlinePos != string::npos)
+    
+    if(getline(lineStream, line, '\n'))
     {
-        // Trim the newline character and return the result
-        line = line.substr(0, newlinePos);
-        break;
+      return line;
     }
   }
-  return line;
 }
 
 //  Function that handles each command 
