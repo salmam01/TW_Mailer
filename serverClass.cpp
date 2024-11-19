@@ -94,25 +94,30 @@ void Server::acceptClients()
   while(!abortRequested)
   {
     cout << "Listening for client connections on port " << ntohs(this->serverAddress.sin_port) << endl;
-    int clientSocket = accept(this->serverSocket, nullptr, nullptr);
-    if (clientSocket >= 0) 
+    if(activeThreads.size() < MAX_CLIENTS)
     {
-      //  Create a thread for each client connection and pass the function and parameter
-      cout << "Client accepted." << endl;
-      thread clientThread(&Server::clientHandler, this, clientSocket);
+      int clientSocket = accept(this->serverSocket, nullptr, nullptr);
+      if (clientSocket >= 0) 
+      {
+        //  Create a thread for each client connection and pass the function and parameter
+        cout << "Client accepted." << endl;
+        thread clientThread(&Server::clientHandler, this, clientSocket);
 
-      this->threadsMutex.lock();
-      //  Move threads into the vector
-      this->activeThreads.push_back(move(clientThread));
-      this->threadsMutex.unlock();
+        this->threadsMutex.lock();
+        //  Move threads into the vector
+        this->activeThreads.push_back(move(clientThread));
+        this->threadsMutex.unlock();
+      }
+      else 
+      {
+        cerr << "Error accepting client connection: " << strerror(errno) << endl;
+        continue;
+      }
     }
-    else 
+    else
     {
-      cerr << "Error accepting client connection: " << strerror(errno) << endl;
-      continue;
+      cerr << "Server capacity is at the maximum." << endl;
     }
-
-    cleanUpThreads();
   }
 
   cleanUpThreads();
@@ -153,7 +158,16 @@ void Server::clientHandler(int clientSocket)
       {
         if(command == "LOGIN")
         {
-          loginHandler(clientSocket);
+          //  ADD IP ADDRESS PLEASE
+          if(!isBlackListed("IP ADDRESS HERE"))
+          {
+            loginHandler(clientSocket);
+          }
+          else
+          {
+            cerr << "You cannot log in for another " << endl;
+            continue;
+          }
         }
         else if(command == "QUIT")
         {
@@ -246,8 +260,9 @@ bool Server::loginHandler(int clientSocket)
   if (establishLDAPConnection(username, password))
   {
     cout << "Client logged in successfully" << endl;
-    sendResponse(clientSocket, true);
     threadsMutex.lock();
+    this->username = username;
+    sendResponse(clientSocket, true);
     isLoggedIn = true;
     threadsMutex.unlock();
     return true;
@@ -290,7 +305,6 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   BerValue bindCredentials;
   bindCredentials.bv_val = const_cast<char*>(password.c_str());
   bindCredentials.bv_len = password.length();
-  cout << "idk" << endl;
 
   // Attempt to bind with the provided credentials
   result = ldap_sasl_bind_s(ldapHandle, bindDN.c_str(), LDAP_SASL_SIMPLE, &bindCredentials, nullptr, nullptr, nullptr);
@@ -299,6 +313,7 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   {
     cerr << "LDAP bind failed: " << ldap_err2string(result) << endl;
     ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
+    checkLoginAttempts();
     return false;
   }
 
@@ -307,6 +322,33 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   // Unbind from the server after authentication
   ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
   return true;
+}
+
+void Server::checkLoginAttempts()
+{
+  if(loginAttempts == maxLoginAttempts)
+  {
+    //  IP!!!
+    blackList.push_back("CLIENT IP");
+    this_thread::sleep_for(chrono::minutes(1));
+  }
+  else
+  {
+    loginAttempts++;
+  }
+}
+
+//  Check if IP adress is inside the vector
+bool Server::isBlackListed(string ip)
+{
+  for(auto &ipAddr : this->blackList)
+  {
+    if(ipAddr == ip)
+    {
+      return true;
+    }
+  }
+  return false;
 }
 
 //  Function that handles each command 
@@ -364,9 +406,6 @@ void Server::sendHandler(int clientSocket)
     return;
   }
 
-  //  get the actual sender at some point, this just for testing
-  string sender = SENDER;
-  
   string receiver = body[0];
   string subject = body[1];
   string message = body[2];
@@ -377,7 +416,7 @@ void Server::sendHandler(int clientSocket)
 
   fstream fout;
   //  Save the new file name as sender.csv inside the Mail Spool Directory location
-  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
 
   //  Open or create a new file with the name (if none exists yet)
   fout.open(mailSpoolFile, ios::out | ios::app);
@@ -450,9 +489,8 @@ vector<string> Server::sendParser(int clientSocket)
 void Server::listHandler(int clientSocket)
 {
   //  temporary
-  string sender = SENDER;
   fstream fin;
-  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
 
   fin.open(mailSpoolFile, ios::in);
   if(!fin.is_open())
@@ -509,9 +547,8 @@ void Server::readHandler(int clientSocket)
     return;
   }
 
-  string sender = SENDER;
   fstream fin;
-  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
+  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
 
   fin.open(mailSpoolFile, ios::in);
   if(!fin.is_open())
@@ -555,7 +592,6 @@ void Server::readHandler(int clientSocket)
 // Function to delete a specific message
 void Server::delHandler(int clientSocket)
 {
-  string sender = SENDER;
   int messageNr;
   try
   {
@@ -569,8 +605,8 @@ void Server::delHandler(int clientSocket)
     return;
   }
 
-  string mailSpoolFile = (mailSpoolDir.path / (sender + ".csv")).string();
-  string tempFilePath = (mailSpoolDir.path / (sender + "Temp.csv")).string();
+  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
+  string tempFilePath = (mailSpoolDir.path / (this->username + "Temp.csv")).string();
 
   fstream fin(mailSpoolFile, ios::in);
   if(!fin.is_open())
