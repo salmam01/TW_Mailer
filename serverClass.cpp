@@ -145,7 +145,7 @@ void Server::clientHandler(int clientSocket)
       return;
     }
     
-    while(true)
+    while(1)
     {
       cout << "Awaiting client request ..." << endl;
       string command = parser(clientSocket);
@@ -193,7 +193,7 @@ string Server::parser(int clientSocket)
   string line;
 
   // Read the data and save it into the buffer
-  while (true)
+  while (1)
   {
     // Clear the buffer
     memset(buffer, 0, BUFFER_SIZE);
@@ -484,6 +484,13 @@ void Server::listHandler(int clientSocket)
   }
   fin.close();
   
+  if(subjects.empty())
+  {
+    cerr << "No messages found." << endl;
+    sendResponse(clientSocket, false);
+    return;
+  }
+
   string response = "Message Count: " + to_string(subjects.size()) + "\n";
 
   for (const auto& subject : subjects) 
@@ -545,11 +552,10 @@ void Server::readHandler(int clientSocket)
   {
     sendResponse(clientSocket, false);
     cerr << "Message does not exist." << endl;
+    return;
   }
-  else
-  {
-    send(clientSocket, response.c_str(), response.size(), 0);
-  }
+  
+  send(clientSocket, response.c_str(), response.size(), 0);
 }
 
 // Function to delete a specific message
