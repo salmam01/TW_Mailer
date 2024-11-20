@@ -9,7 +9,7 @@ Client::Client(const char *ip, int port)
         socket_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (socket_fd == -1)
         {
-            perror("Socket error");
+            cerr << "Socket error" << endl;
             exit(EXIT_FAILURE);
         }
 
@@ -24,7 +24,7 @@ bool Client::connect_to_server()
     {
         if (connect(socket_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
         {
-            perror("Connect error - no server available");
+            cerr << "Connection error - no server available" << endl;
             return false;
         }
         printf("Connection with server (%s) established\n", inet_ntoa(server_address.sin_addr));
@@ -36,7 +36,7 @@ void Client::receive_data()
         int size = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
         if (size == -1)
         {
-            perror("recv error");
+            cerr << "recv error" << endl;
         }
         else if (size == 0)
         {
@@ -54,7 +54,7 @@ bool Client::send_command(const string &command)
     {
         if (send(socket_fd, command.c_str(), command.length(), 0) == -1)
         {
-            perror("send error");
+            cerr << "Error: " << strerror(errno) << endl;
             return false;
         }
         return true;
@@ -65,12 +65,12 @@ void Client::close_connection()
         if (socket_fd != -1)
         {
             if (shutdown(socket_fd, SHUT_RDWR) == -1)
-            {
-                perror("shutdown socket");
+            {   
+                cerr << "Error: shutdown socket" << endl;
             }
             if (close(socket_fd) == -1)
             {
-                perror("close socket");
+                cerr << "Error: close socket" << endl;
             }
             socket_fd = -1;
         }
@@ -88,11 +88,11 @@ char* Client::get_buffer()
 
 int Client::specificMessage(int socket){
    string msgNumber;
-   cout << "Number of message: ";
+   cout << "Number of messages: ";
    getline(cin, msgNumber);
    if ((send(socket, msgNumber.c_str(), msgNumber.size(), 0)) == -1) 
       {
-         perror("send error");
+         cerr << "Error: " << strerror(errno) << endl;
          return -1;
       }
    
@@ -148,7 +148,7 @@ string Client::getpass() {
 int Client::loginCommand(int socket){
    if ((send(socket, "LOGIN", 6, 0)) == -1) 
       {
-         perror("send error");
+         cerr << "Error: " << strerror(errno) << endl;
          return -1;
       }
 
@@ -192,8 +192,8 @@ int Client::sendCommand(int socket){
    cout << "Subject(max. 80 chars): ";
    getline(cin, subject);
    if(subject.size()>80){
-      perror("Maximum size of 80 characters for subject!\n");
-      return -1;
+        cerr << "Error: Maximum size of 80 characters for subject!" << endl;
+        return -1;
    }
    if ((send(socket, subject.c_str(), subject.size(), 0)) == -1) 
       {

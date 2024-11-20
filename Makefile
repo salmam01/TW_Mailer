@@ -1,18 +1,23 @@
 CXX = g++
+CXXFLAGS = -Wall #for Warnings
 
-CXXFLAGS = -Wall
+# Server conf
+SERVER_SRCS = server.cpp serverClass.cpp
+SERVER_HEADERS = serverHeaders.h serverClass.h
+SERVER_OUTPUT = server
+SERVER_LDFLAGS = -lldap -llber
 
-SRCS = server.cpp serverClass.cpp
+# Client conf
+CLIENT_SRCS = client.cpp clientClass.cpp
+CLIENT_HEADERS = clientHeaders.h clientClass.h
+CLIENT_OUTPUT = client
 
-HEADERS = serverHeaders.h serverClass.h
+all: $(SERVER_OUTPUT) $(CLIENT_OUTPUT)
 
-OUTPUT = server
+#server bin
+$(SERVER_OUTPUT): $(SERVER_SRCS) $(SERVER_HEADERS)
+	$(CXX) $(CXXFLAGS) $(SERVER_SRCS) -o $(SERVER_OUTPUT) $(SERVER_LDFLAGS)
 
-LDFLAGS = -lldap -llber
-
-$(OUTPUT): $(SRCS) $(HEADERS)
-	$(CXX) $(CXXFLAGS) $(SRCS) -o $(OUTPUT) $(LDFLAGS)
-
-# um die kompilierte binary zu löschen, build from scratch falls library/header probleme/änderungen
-#clean:
-#	rm -f $(OUTPUT)
+#client bin
+$(CLIENT_OUTPUT): $(CLIENT_SRCS) $(CLIENT_HEADERS)
+	$(CXX) $(CXXFLAGS) $(CLIENT_SRCS) -o $(CLIENT_OUTPUT)
