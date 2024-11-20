@@ -53,11 +53,11 @@ int main(int argc, char **argv)
     do
     {
         // Print the prompt to get user command
-        printf(">> ");
+        cout << ">> ";
         string command;
         getline(cin, command);
         transform(command.begin(), command.end(), command.begin(), ::toupper);
-
+        //client.commandHandler();
         if (!client.isLoggedIn)
         {
             // Handle commands allowed when not logged in
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
             else if (command == "QUIT")
             {
                 client.isQuit = true;
-                if (!client.send_command("QUIT"))
+                if (!client.sendCommandToServer("QUIT"))
                 {
                     continue;
                 }
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
             else if (command == "QUIT")
             {
                 client.isQuit = true;
-                if (!client.send_command("QUIT"))
+                if (!client.sendCommandToServer("QUIT"))
                 {
                     continue;
                 }
@@ -146,13 +146,13 @@ int main(int argc, char **argv)
             }
             else if (size == 0)
             {
-                printf("Server closed remote socket\n");
+                cerr << "Server closed remote socket" << endl;
                 break;
             }
             else
             {
                 client.get_buffer()[size] = '\0';
-                printf("%s\n", client.get_buffer());
+                cout << client.get_buffer() << endl;
 
                 // Handle server response like << OK or << ERR
                 if (strstr(client.get_buffer(), "<< OK") ||

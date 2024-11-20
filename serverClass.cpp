@@ -295,8 +295,7 @@ bool Server::loginHandler(int clientSocket)
     if (username.empty())
     {
         cerr << "Username cannot be empty." << endl;
-        sendLoginResponse(clientSocket, false);
-        //sendResponse(clientSocket, false);
+        sendResponse(clientSocket, false);
         return false;
     }
     cout << "Username received: " << username << endl;
@@ -306,8 +305,7 @@ bool Server::loginHandler(int clientSocket)
     if (password.empty())
     {
         cerr << "Password cannot be empty." << endl;
-        sendLoginResponse(clientSocket, false);
-        //sendResponse(clientSocket, false);
+        sendResponse(clientSocket, false);
         return false;
     }
     cout << "Password received." << endl;
@@ -321,15 +319,13 @@ bool Server::loginHandler(int clientSocket)
         cout << "LDAP authentication successful for user: " << username << endl;
         this->username = username; // Save the username for session tracking
         isLoggedIn = true;         // Update login status
-        sendLoginResponse(clientSocket, true);
-        //sendResponse(clientSocket, true); // Send success response to client
+        sendResponse(clientSocket, true); // Send success response to client
         return true;
     }
     else
     {
         cerr << "LDAP authentication failed for user: " << username << endl;
-        sendLoginResponse(clientSocket, false);
-        //sendResponse(clientSocket, false); // Send failure response to client
+        sendResponse(clientSocket, false); // Send failure response to client
         return false;
     }
 }
@@ -382,12 +378,6 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   // Unbind from the server after authentication
   ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
   return true;
-}
-
-void Server::sendLoginResponse(int clientSocket, bool success)
-{
-  string response = success ? "<< OK: Login Successful" : "<< ERR: Invalid Credentials";
-  send(clientSocket, response.c_str(), response.size(), 0);
 }
 
 //  Method that keeps track of the clients login attempts and blacklists them if needed

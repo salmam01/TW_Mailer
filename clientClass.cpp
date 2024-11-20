@@ -27,7 +27,7 @@ bool Client::connectToServer()
       cerr << "Connection error - no server available" << endl;
       return false;
    }
-   printf("Connection with server (%s) established\n", inet_ntoa(server_address.sin_addr));
+   cout << "Connection with server" << inet_ntoa(server_address.sin_addr) << "established" << endl;
    return true;
 }
 
@@ -52,16 +52,16 @@ void Client::receiveData()
    int size = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
    if (size == -1)
    {
-      cerr << "recv error" << endl;
+      cerr << "recv error." << endl;
    }
    else if (size == 0)
    {
-      printf("Server closed remote socket\n");
+      cerr << "Server closed remote socket" << endl;
    }
    else
    {
       buffer[size] = '\0';
-      printf("%s", buffer);
+      cout << buffer << endl;
    }
    memset(buffer, 0, BUFFER_SIZE);
 }
@@ -73,7 +73,7 @@ int Client::commandHandler()
 }
 */
 
-bool Client::send_command(const string &command)
+bool Client::sendCommandToServer(const string &command)
 {
    if (send(socket_fd, command.c_str(), command.length(), 0) == -1)
    {
@@ -112,7 +112,7 @@ char* Client::get_buffer()
 int Client::specificMessage(int socket)
 {
    string msgNumber;
-   cout << "Number of messages: ";
+   cout << "Message Number: ";
    getline(cin, msgNumber);
    if ((send(socket, msgNumber.c_str(), msgNumber.size(), 0)) == -1) 
    {

@@ -15,23 +15,28 @@ class Client
     public:
     bool isLoggedIn = false;
     bool isQuit = false;
+    
     Client(const char *ip, int port);
-    void closeConnectionSignal();
-    bool connectToServer();
-    void receiveData();
-    bool send_command(const std::string &command);
-    void closeConnection();
     int get_socket_fd() const;
     char* get_buffer();
-    int specificMessage(int socket);
-    int getch();
-    std::string getpass();
+
+    bool connectToServer();
+    void closeConnection();
+    void closeConnectionSignal();
+    
+    void receiveData();
     int commandHandler(int socket);
     int loginCommand(int socket);
     int sendCommand(int socket);
     int listCommand(int socket);
     int readCommand(int socket);
     int delCommand(int socket);
+    bool sendCommandToServer(const std::string &command);
+
+    int specificMessage(int socket);
+    int getch();
+    std::string getpass();
+
 };
 
 
