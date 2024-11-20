@@ -4,7 +4,7 @@
 using namespace std;
 
 //  Global server pointer to be able to pass a function if a signal is called
-Server * serverPtr;
+Server * serverPtr = nullptr;
 
 void printUsage()
 {

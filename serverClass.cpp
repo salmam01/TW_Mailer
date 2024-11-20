@@ -218,7 +218,7 @@ string Server::parser(int clientSocket)
     buffer[bytesRead] = '\0';
     stringstream lineStream(buffer);
 
-    cout << "Received client input: " << buffer << endl;
+    //cout << "Received client input: " << buffer << endl;
     
     if(getline(lineStream, line, '\n'))
     {
@@ -386,8 +386,8 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
 
 void Server::sendLoginResponse(int clientSocket, bool success)
 {
-    string response = success ? "<< OK: Login Successful" : "<< ERR: Invalid Credentials";
-    send(clientSocket, response.c_str(), response.size(), 0);
+  string response = success ? "<< OK: Login Successful" : "<< ERR: Invalid Credentials";
+  send(clientSocket, response.c_str(), response.size(), 0);
 }
 
 //  Method that keeps track of the clients login attempts and blacklists them if needed
@@ -429,7 +429,6 @@ bool Server::isBlackListed(string ip)
   }
   return false;
 }
-
 
 //  Method to save a sent message inside a csv file
 void Server::sendHandler(int clientSocket)

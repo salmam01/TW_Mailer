@@ -16,6 +16,7 @@ class Client
     bool isLoggedIn = false;
     bool isQuit = false;
     Client(const char *ip, int port);
+    void closeConnection();
     bool connect_to_server();
     void receive_data();
     bool send_command(const std::string &command);
@@ -30,8 +31,6 @@ class Client
     int listCommand(int socket);
     int readCommand(int socket);
     int delCommand(int socket);
-
-
 };
 
 

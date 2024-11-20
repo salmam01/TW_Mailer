@@ -3,6 +3,20 @@
 
 using namespace std;
 
+Client * clientPtr = nullptr;
+
+void signalHandler(int sig)
+{
+  if(sig == SIGINT)
+  {
+    if(clientPtr != nullptr)
+    {
+      cerr << "Shutdown requested by Client." << endl;
+      clientPtr->closeConnection();
+    }
+  }
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3)
@@ -21,6 +35,7 @@ int main(int argc, char **argv)
     }
 
     Client client(argv[1], port);
+    clientPtr = &client;
 
     if (!client.connect_to_server())
     {
@@ -28,122 +43,127 @@ int main(int argc, char **argv)
     }
 
     client.receive_data();  // Read initial data or welcome message
-
-do
-{
-    // Print the prompt to get user command
-    printf(">> ");
-    string command;
-    getline(cin, command);
-    transform(command.begin(), command.end(), command.begin(), ::toupper);
-
-    if (!client.isLoggedIn)
+    
+    if(signal(SIGINT, signalHandler) == SIG_ERR)
     {
-        // Handle commands allowed when not logged in
-        if (command == "LOGIN")
+        cerr << "Error registering signal." << endl;
+    }
+
+    do
+    {
+        // Print the prompt to get user command
+        printf(">> ");
+        string command;
+        getline(cin, command);
+        transform(command.begin(), command.end(), command.begin(), ::toupper);
+
+        if (!client.isLoggedIn)
         {
-            if (client.loginCommand(client.get_socket_fd()) == -1)
+            // Handle commands allowed when not logged in
+            if (command == "LOGIN")
             {
+                if (client.loginCommand(client.get_socket_fd()) == -1)
+                {
+                    continue;
+                }
+                client.isLoggedIn = true; // Assume successful login sets this to true
                 continue;
             }
-            client.isLoggedIn = true; // Assume successful login sets this to true
-            continue;
-        }
-        else if (command == "QUIT")
-        {
-            client.isQuit = true;
-            if (!client.send_command("QUIT"))
+            else if (command == "QUIT")
             {
+                client.isQuit = true;
+                if (!client.send_command("QUIT"))
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                cout << "You need to login first!" << endl;
                 continue;
             }
         }
         else
         {
-            cout << "You need to login first!" << endl;
-            continue;
-        }
-    }
-    else
-    {
-        // Handle commands allowed when logged in
-        if (command == "SEND")
-        {
-            if (client.sendCommand(client.get_socket_fd()) == -1)
+            // Handle commands allowed when logged in
+            if (command == "SEND")
             {
+                if (client.sendCommand(client.get_socket_fd()) == -1)
+                {
+                    continue;
+                }
+            }
+            else if (command == "LIST")
+            {
+                if (client.listCommand(client.get_socket_fd()) == -1)
+                {
+                    continue;
+                }
+            }
+            else if (command == "READ")
+            {
+                if (client.readCommand(client.get_socket_fd()) == -1)
+                {
+                    continue;
+                }
+            }
+            else if (command == "DEL")
+            {
+                if (client.delCommand(client.get_socket_fd()) == -1)
+                {
+                    continue;
+                }
+            }
+            else if (command == "QUIT")
+            {
+                client.isQuit = true;
+                if (!client.send_command("QUIT"))
+                {
+                    continue;
+                }
+            }
+            else if (command == "LOGIN")
+            {
+                cout << "You are already logged in!" << endl;
+                continue;
+            }
+            else
+            {
+                cout << "No valid command!" << endl;
                 continue;
             }
         }
-        else if (command == "LIST")
-        {
-            if (client.listCommand(client.get_socket_fd()) == -1)
-            {
-                continue;
-            }
-        }
-        else if (command == "READ")
-        {
-            if (client.readCommand(client.get_socket_fd()) == -1)
-            {
-                continue;
-            }
-        }
-        else if (command == "DEL")
-        {
-            if (client.delCommand(client.get_socket_fd()) == -1)
-            {
-                continue;
-            }
-        }
-        else if (command == "QUIT")
-        {
-            client.isQuit = true;
-            if (!client.send_command("QUIT"))
-            {
-                continue;
-            }
-        }
-        else if (command == "LOGIN")
-        {
-            cout << "You are already logged in!" << endl;
-            continue;
-        }
-        else
-        {
-            cout << "No valid command!" << endl;
-            continue;
-        }
-    }
 
-    // Process the server's response
-    if (!client.isQuit)
-    {
-        int size = recv(client.get_socket_fd(), client.get_buffer(), BUFFER_SIZE - 1, 0);
-        if (size == -1)
+        // Process the server's response
+        if (!client.isQuit)
         {
-            perror("recv error");
-            break;
-        }
-        else if (size == 0)
-        {
-            printf("Server closed remote socket\n");
-            break;
-        }
-        else
-        {
-            client.get_buffer()[size] = '\0';
-            printf("%s\n", client.get_buffer());
-
-            // Handle server response like << OK or << ERR
-            if (strstr(client.get_buffer(), "<< OK") ||
-                strstr(client.get_buffer(), "<< ERR") ||
-                strstr(client.get_buffer(), "<< LOGIN FIRST"))
+            int size = recv(client.get_socket_fd(), client.get_buffer(), BUFFER_SIZE - 1, 0);
+            if (size == -1)
             {
-                memset(client.get_buffer(), 0, BUFFER_SIZE); // Clear buffer for next command
+                perror("recv error");
+                break;
+            }
+            else if (size == 0)
+            {
+                printf("Server closed remote socket\n");
+                break;
+            }
+            else
+            {
+                client.get_buffer()[size] = '\0';
+                printf("%s\n", client.get_buffer());
+
+                // Handle server response like << OK or << ERR
+                if (strstr(client.get_buffer(), "<< OK") ||
+                    strstr(client.get_buffer(), "<< ERR") ||
+                    strstr(client.get_buffer(), "<< LOGIN FIRST"))
+                {
+                    memset(client.get_buffer(), 0, BUFFER_SIZE); // Clear buffer for next command
+                }
             }
         }
-    }
 
-} while (!client.isQuit);
+    } while (!client.isQuit);
 
     client.close_connection();
 

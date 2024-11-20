@@ -16,5 +16,6 @@
 #include <algorithm> // for transform
 #include <ctype.h>   // for toupper
 #include <termios.h>
+#include <signal.h>
 
 #endif // CLIENT_HEADERS_H
