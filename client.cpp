@@ -3,8 +3,19 @@
 
 using namespace std;
 
+//  Global client pointer to be able to pass a function if a signal is called
 Client * clientPtr = nullptr;
 
+//  Function to print the usage of the client
+void printUsage()
+{
+    cout << "** CLIENT USAGE **" << endl;
+    cout << "./client <ip> <port>" << endl;
+    cout << "<ip>: must be a NUMBER or LOCALHOST" << endl;
+    cout << "<port>: must be a NUMBER" << endl;
+}
+
+//  Function that handles CTRL + C on client side
 void signalHandler(int sig)
 {
   if(sig == SIGINT)

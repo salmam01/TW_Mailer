@@ -36,7 +36,6 @@ class Client
     int specificMessage(int socket);
     int getch();
     std::string getpass();
-
 };
 
 

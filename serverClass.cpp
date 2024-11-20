@@ -153,6 +153,7 @@ void Server::clientHandler(int clientSocket)
       return;
     }
     
+    //  Client thread runs until an error occurs or the client sends "QUIT" 
     while(1)
     {
       cout << "Awaiting client request ..." << endl;
@@ -231,7 +232,8 @@ string Server::parser(int clientSocket)
 void Server::commandHandler(int clientSocket, string command)
 {
   cout << "Received command: " << command << endl;
-
+  
+  //  Checks if client is logged in before allowing access to other commands
   if(!isLoggedIn)
   {
     if(command == "LOGIN")
@@ -381,6 +383,7 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
 }
 
 //  Method that keeps track of the clients login attempts and blacklists them if needed
+//  Not functional
 void Server::checkLoginAttempts()
 {
   lock_guard<mutex> lock(this->threadsMutex);
@@ -407,6 +410,7 @@ void Server::checkLoginAttempts()
 }
 
 //  Method that checks if the client is black listed
+//  Not functional
 bool Server::isBlackListed(string ip)
 {
   lock_guard<mutex> lock(this->threadsMutex);

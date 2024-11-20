@@ -6,6 +6,7 @@ using namespace std;
 //  Global server pointer to be able to pass a function if a signal is called
 Server * serverPtr = nullptr;
 
+//  Function to print the usage of the server
 void printUsage()
 {
   cout << "** SERVER USAGE **" << endl;
@@ -14,18 +15,21 @@ void printUsage()
   cout << "<mail-spool-directoryname>: must be a PATH" << endl;
 }
 
+//  Function that handles CTRL + C on server side
 void signalHandler(int sig)
 {
   if(sig == SIGINT)
   {
     if(serverPtr != nullptr)
     {
-      cerr << "Shutdown Requested" << endl;
+      cerr << "Shutdown Requested ..." << endl;
       serverPtr->shutDown();
     }
+    exit(0);
   }
 }
 
+//  Initiates the server instance and starts the server
 int main(int argc, char *argv[])
 {
   //  Check for missing arguments
@@ -49,7 +53,7 @@ int main(int argc, char *argv[])
 
   if(!(server.start()))
   {
-    cerr << "Server failed to start" << endl;
+    cerr << "Server failed to start." << endl;
     return EXIT_FAILURE;
   }
 
