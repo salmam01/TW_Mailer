@@ -4,7 +4,7 @@
 using namespace std;
 using namespace filesystem;
 
-
+//  Server contructor initializes the addres struct and specified mail_spool
 Server::Server(int port, string mailSpoolDirName)
 {
   memset(&this->serverAddress, 0, sizeof(this->serverAddress));
@@ -22,14 +22,17 @@ Server::Server(int port, string mailSpoolDirName)
   }
 } 
 
+//  Method to gracefully shut the server down when SIGINT is caught
 void Server::shutDown()
 {
   cerr << "Shutting down server..." << endl;
   this->abortRequested = true;
+  cleanUpThreads();
   shutdown(this->serverSocket, SHUT_RDWR);
   close(this->serverSocket);
 }
 
+//  Method that handles the server start 
 bool Server::start()
 {
   //  Create a new socket
@@ -88,7 +91,7 @@ bool Server::start()
   return true;
 }
 
-//  Function that accepts clients until the server is shut down
+//  Method that accepts clients until the server is shut down
 void Server::acceptClients()
 {
   while(!abortRequested)
@@ -103,10 +106,9 @@ void Server::acceptClients()
         cout << "Client accepted." << endl;
         thread clientThread(&Server::clientHandler, this, clientSocket);
 
-        this->threadsMutex.lock();
+        lock_guard<mutex> lockMutex(this->threadsMutex);
         //  Move threads into the vector
         this->activeThreads.push_back(move(clientThread));
-        this->threadsMutex.unlock();
       }
       else 
       {
@@ -123,7 +125,7 @@ void Server::acceptClients()
   cleanUpThreads();
 }
 
-//  Helper function for acceptclient that joins all finished threads 
+//  Helper method for acceptclient that joins all finished threads 
 void Server::cleanUpThreads()
 {
   //  Critical section
@@ -139,6 +141,7 @@ void Server::cleanUpThreads()
   this->activeThreads.clear();
 }
 
+//  Method that handles the client input until QUIT is called 
 void Server::clientHandler(int clientSocket)
 {
   try
@@ -211,6 +214,7 @@ void Server::clientHandler(int clientSocket)
   }
 }
 
+//  Method to parse client input 
 string Server::parser(int clientSocket)
 {
   // Buffer reads the data, bytesRead determines the actual number of bytes read
@@ -221,10 +225,9 @@ string Server::parser(int clientSocket)
   // Read the data and save it into the buffer
   while (1)
   {
-    // Clear the buffer
+    // Clear the buffer 
     memset(buffer, 0, BUFFER_SIZE);
     bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
-
     if (bytesRead == 0)
     {
       cerr << "Client closed the connection." << endl;
@@ -235,11 +238,9 @@ string Server::parser(int clientSocket)
       cerr << "Error while reading message body." << endl;
       return "";
     }
-
     
     buffer[bytesRead] = '\0';
     stringstream lineStream(buffer);
-    //lineStream.write(buffer, bytesRead);
 
     cout << "Received client input: " << buffer << endl;
     
@@ -250,21 +251,35 @@ string Server::parser(int clientSocket)
   }
 }
 
+//  Method that takes the client credentials and tries to log them in
 bool Server::loginHandler(int clientSocket)
 {
+  //  Get username and password using the parser
   string username = parser(clientSocket);
-  cout << "Username works." << endl;
+  if(username.empty())
+  {
+    cerr << "Username cannot be empty." << endl;
+    sendResponse(clientSocket, false);
+    return false;
+  }
+  cout << "Username: " << username << endl;
+
   string password = parser(clientSocket);
-  cout << "Username and password work." << endl;
+  if(password.empty())
+  {
+    cerr << "Password cannot be empty." << endl;
+    sendResponse(clientSocket, false);
+    return false;
+  }
+  cout << "Password works." << endl;
   
+  lock_guard<mutex> lock(this->threadsMutex);
   if (establishLDAPConnection(username, password))
   {
     cout << "Client logged in successfully" << endl;
-    threadsMutex.lock();
     this->username = username;
-    sendResponse(clientSocket, true);
     isLoggedIn = true;
-    threadsMutex.unlock();
+    sendResponse(clientSocket, true);
     return true;
   }
   else
@@ -275,6 +290,7 @@ bool Server::loginHandler(int clientSocket)
   }
 }
 
+//  Method to connect to the LDAP server and check if the clients credentials are valid
 bool Server::establishLDAPConnection(const string& username, const string& password)
 {
   LDAP* ldapHandle;
@@ -324,13 +340,25 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   return true;
 }
 
+//  Method that keeps track of the clients login attempts and blacklists them if needed
 void Server::checkLoginAttempts()
 {
+  lock_guard<mutex> lock(this->threadsMutex);
   if(loginAttempts == maxLoginAttempts)
   {
     //  IP!!!
     blackList.push_back("CLIENT IP");
     this_thread::sleep_for(chrono::minutes(1));
+    
+    for(auto &ipAddr : this->blackList)
+    {
+      /*
+      if(ipAddr == ip)
+      {
+        return blackList.erase(ip);
+        blackList.resize();
+      }*/
+    }
   }
   else
   {
@@ -338,9 +366,10 @@ void Server::checkLoginAttempts()
   }
 }
 
-//  Check if IP adress is inside the vector
+//  Method that checks if the client is black listed
 bool Server::isBlackListed(string ip)
 {
+  lock_guard<mutex> lock(this->threadsMutex);
   for(auto &ipAddr : this->blackList)
   {
     if(ipAddr == ip)
@@ -351,13 +380,13 @@ bool Server::isBlackListed(string ip)
   return false;
 }
 
-//  Function that handles each command 
+//  Method that handles each command 
 void Server::commandHandler(int clientSocket, string command)
 {
   cout << "Received command: " << command << endl;
   if(!isLoggedIn)
   {
-    cout << "Fuck you!" << endl;
+    cout << "Cannot access commands without being logged in." << endl;
     sendResponse(clientSocket, false);
     return;
   }
@@ -381,12 +410,6 @@ void Server::commandHandler(int clientSocket, string command)
     cout << "Handling DEL command." << endl;
     delHandler(clientSocket);
   }
-  else if (command == "QUIT")
-  {
-    cout << "Handling QUIT command." << endl;
-    sendResponse(clientSocket, true);
-    close(clientSocket);
-  }
   else
   {
     // Invalid command
@@ -395,7 +418,7 @@ void Server::commandHandler(int clientSocket, string command)
   }
 }
 
-//  Function to save a sent message inside a csv file
+//  Method to save a sent message inside a csv file
 void Server::sendHandler(int clientSocket)
 {
   vector<string> body = sendParser(clientSocket);
@@ -416,7 +439,7 @@ void Server::sendHandler(int clientSocket)
 
   fstream fout;
   //  Save the new file name as sender.csv inside the Mail Spool Directory location
-  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
+  string mailSpoolFile = getMailSpoolFile();
 
   //  Open or create a new file with the name (if none exists yet)
   fout.open(mailSpoolFile, ios::out | ios::app);
@@ -448,7 +471,7 @@ void Server::sendHandler(int clientSocket)
   sendResponse(clientSocket, true);
 }
 
-//  Helper function of sendHandler to parse the request body 
+//  Helper Method of sendHandler to parse the request body 
 //  Important: Add a limit on how many characters a client can send 
 vector<string> Server::sendParser(int clientSocket)
 {
@@ -459,6 +482,11 @@ vector<string> Server::sendParser(int clientSocket)
   {
     //  Use the parser function to extract each line
     line = parser(clientSocket);
+    if(line.empty())
+    {
+      body.clear();
+      return body;
+    }
 
     if (line == ".") 
     {
@@ -467,7 +495,7 @@ vector<string> Server::sendParser(int clientSocket)
 
     if(body.size() < 3)
     {
-      // Save receiver, subject
+      // Save receiver & subject
       body.push_back(line);
     }
     //  If body size is greater than 3, save the message into one index
@@ -485,12 +513,11 @@ vector<string> Server::sendParser(int clientSocket)
   return body;
 }
 
-//  Function that lists everything inside the csv file for the specified user
+//  Method that lists the subjects inside the csv file for the specified user
 void Server::listHandler(int clientSocket)
 {
-  //  temporary
   fstream fin;
-  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
+  string mailSpoolFile = getMailSpoolFile();
 
   fin.open(mailSpoolFile, ios::in);
   if(!fin.is_open())
@@ -502,7 +529,6 @@ void Server::listHandler(int clientSocket)
 
   string line;
   vector<string> subjects;
-  //  Loop until the end of the file
   while(getline(fin, line))
   {
     stringstream ss(line);
@@ -527,12 +553,19 @@ void Server::listHandler(int clientSocket)
 
   for (const auto& subject : subjects) 
   {
-      response += subject + "\n";
+    response += subject + "\n";
   }
-  send(clientSocket, response.c_str(), response.size(), 0);
+  if((send(clientSocket, response.c_str(), response.size(), 0)) == -1)
+  {
+    cerr << "Error while sending LIST data to client." << endl;
+    sendResponse(clientSocket, false);
+    return;
+  }
+
+  cout << "LIST data sent to client succesfully." << endl;
 }
 
-//  Function to read a specific message
+//  Method to read a message specified by the client
 void Server::readHandler(int clientSocket)
 {
   int messageNr;
@@ -548,7 +581,7 @@ void Server::readHandler(int clientSocket)
   }
 
   fstream fin;
-  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
+  string mailSpoolFile = getMailSpoolFile();
 
   fin.open(mailSpoolFile, ios::in);
   if(!fin.is_open())
@@ -586,10 +619,17 @@ void Server::readHandler(int clientSocket)
     return;
   }
   
-  send(clientSocket, response.c_str(), response.size(), 0);
+  sendResponse(clientSocket, true);
+  if((send(clientSocket, response.c_str(), response.size(), 0)) == -1)
+  {
+    cerr << "Error while sending READ data to client." << endl;
+    sendResponse(clientSocket, false);
+    return;
+  }
+  cout << "LIST data sent to client successfully." << endl;
 }
 
-// Function to delete a specific message
+// Method to delete a message specificied by the client
 void Server::delHandler(int clientSocket)
 {
   int messageNr;
@@ -605,7 +645,7 @@ void Server::delHandler(int clientSocket)
     return;
   }
 
-  string mailSpoolFile = (mailSpoolDir.path / (this->username + ".csv")).string();
+  string mailSpoolFile = getMailSpoolFile();
   string tempFilePath = (mailSpoolDir.path / (this->username + "Temp.csv")).string();
 
   fstream fin(mailSpoolFile, ios::in);
@@ -656,6 +696,7 @@ void Server::delHandler(int clientSocket)
       return;
     }
     sendResponse(clientSocket, true);
+    cout << "Message" << messageNr << "deleted successfully." << endl;
   }
   else
   {
@@ -665,15 +706,37 @@ void Server::delHandler(int clientSocket)
   }
 }
 
-//  Function that handles simple responses to the client
+//  Method that returns the users Mail-Spool file
+string Server::getMailSpoolFile()
+{
+  //  Critical section
+  lock_guard<mutex> lockMutex(this->threadsMutex);
+  return (mailSpoolDir.path / (this->username + ".csv")).string();
+}
+
+//  Method that handles simple responses to the client
 void Server::sendResponse(int clientSocket, bool state)
 {
   if(state)
   {
-    send(clientSocket, "OK\n", 3, 0);
+    if((send(clientSocket, "OK\n", 3, 0)) == -1)
+    {
+      cerr << "Error occured while sending OK response to client." << endl;
+    }
+    else
+    {
+      cerr << "OK reponse sent to client successfully." << endl;
+    }
   }
   else
   {
-    send(clientSocket, "ERR\n", 4, 0);
+    if((send(clientSocket, "ERR\n", 4, 0)) == -1)
+    {
+      cerr << "Error occured while sending ERR response to client." << endl;
+    }
+    else
+    {
+      cerr << "ERR reponse sent to client successfully." << endl;
+    }
   }
 }

@@ -59,6 +59,7 @@ class Server
     void readHandler(int clientSocket);
     void delHandler(int clientSocket);
 
+    std::string getMailSpoolFile();
     void sendResponse(int clientSocket, bool state);
 };
 
