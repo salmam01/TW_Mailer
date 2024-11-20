@@ -46,13 +46,14 @@ class Server
 
     void clientHandler(int clientSocket);
     std::string parser(int clientSocket);
-    
+
+    void commandHandler(int clientSocket, std::string command);
+
     bool loginHandler(int clientSocket);
     bool establishLDAPConnection(const std::string& username, const std::string& password);
     void checkLoginAttempts();
     bool isBlackListed(std::string ip);
 
-    void commandHandler(int clientSocket, std::string command);
     void sendHandler(int clientSocket);
     std::vector<std::string> sendParser(int clientSocket);
     void listHandler(int clientSocket);

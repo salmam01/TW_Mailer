@@ -159,37 +159,13 @@ void Server::clientHandler(int clientSocket)
       string command = parser(clientSocket);
       if(!command.empty())
       {
-        if(command == "LOGIN")
-        {
-          //  ADD IP ADDRESS PLEASE
-          if(!isBlackListed("IP ADDRESS HERE"))
-          {
-            loginHandler(clientSocket);
-          }
-          else
-          {
-            cerr << "You cannot log in for another " << endl;
-            continue;
-          }
-        }
-        else if(command == "QUIT")
+        if(command == "QUIT")
         {
           cout << "Client has closed the connection." << endl;
           close(clientSocket);
           return;
         }
-        else
-        {
-          if(isLoggedIn)
-          {
-            commandHandler(clientSocket, command);
-          }
-          else
-          {
-            cerr << "You have to be logged in to access other commands." << endl;
-            cerr << "Type LOGIN to proceed." << endl;
-          }
-        }
+        commandHandler(clientSocket, command);
       }
       else
       {
@@ -247,6 +223,66 @@ string Server::parser(int clientSocket)
     if(getline(lineStream, line, '\n'))
     {
       return line;
+    }
+  }
+}
+
+//  Method that handles each command 
+void Server::commandHandler(int clientSocket, string command)
+{
+  cout << "Received command: " << command << endl;
+
+  if(!isLoggedIn)
+  {
+    if(command == "LOGIN")
+    {
+      //  ADD IP ADDRESS PLEASE
+      if(!isBlackListed("IP ADDRESS HERE"))
+      {
+        loginHandler(clientSocket);
+      }
+      else
+      {
+        cerr << "Client is currently blacklisted." << endl;
+        sendResponse(clientSocket, false);
+        return;
+      }
+    }
+    else
+    {
+      cerr << "Client cannot access commands without being logged in." << endl;
+      sendResponse(clientSocket, false);
+    }
+    return;
+  }
+
+  if(isLoggedIn)
+  {
+    if (command == "SEND")
+    {
+      cout << "Handling SEND command." << endl;
+      sendHandler(clientSocket); 
+    }
+    else if (command == "LIST")
+    {
+      cout << "Handling LIST command." << endl;
+      listHandler(clientSocket);
+    }
+    else if (command == "READ")
+    {
+      cout << "Handling READ command." << endl;
+      readHandler(clientSocket);
+    }
+    else if (command == "DEL")
+    {
+      cout << "Handling DEL command." << endl;
+      delHandler(clientSocket);
+    }
+    else
+    {
+      // Invalid command
+      sendResponse(clientSocket, false);
+      cerr << "Invalid Command." << endl;
     }
   }
 }
@@ -350,15 +386,15 @@ void Server::checkLoginAttempts()
     blackList.push_back("CLIENT IP");
     this_thread::sleep_for(chrono::minutes(1));
     
-    for(auto &ipAddr : this->blackList)
+    /*for(auto &ipAddr : this->blackList)
     {
-      /*
+      
       if(ipAddr == ip)
       {
         return blackList.erase(ip);
         blackList.resize();
-      }*/
-    }
+      }
+    }*/
   }
   else
   {
@@ -380,43 +416,6 @@ bool Server::isBlackListed(string ip)
   return false;
 }
 
-//  Method that handles each command 
-void Server::commandHandler(int clientSocket, string command)
-{
-  cout << "Received command: " << command << endl;
-  if(!isLoggedIn)
-  {
-    cout << "Cannot access commands without being logged in." << endl;
-    sendResponse(clientSocket, false);
-    return;
-  }
-  if (command == "SEND")
-  {
-    cout << "Handling SEND command." << endl;
-    sendHandler(clientSocket); 
-  }
-  else if (command == "LIST")
-  {
-    cout << "Handling LIST command." << endl;
-    listHandler(clientSocket);
-  }
-  else if (command == "READ")
-  {
-    cout << "Handling READ command." << endl;
-    readHandler(clientSocket);
-  }
-  else if (command == "DEL")
-  {
-    cout << "Handling DEL command." << endl;
-    delHandler(clientSocket);
-  }
-  else
-  {
-    // Invalid command
-    sendResponse(clientSocket, false);
-    cerr << "Invalid Command." << endl;
-  }
-}
 
 //  Method to save a sent message inside a csv file
 void Server::sendHandler(int clientSocket)
