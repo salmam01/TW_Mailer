@@ -148,7 +148,7 @@ string Client::getpass() {
 int Client::loginCommand(int socket){
    if ((send(socket, "LOGIN", 6, 0)) == -1) 
       {
-         cerr << "Error: " << strerror(errno) << endl;
+         cerr << "Error sending LOGIN command: " << strerror(errno) << endl;
          return -1;
       }
 
@@ -159,17 +159,43 @@ int Client::loginCommand(int socket){
    getline(cin, username);
    if ((send(socket, username.c_str(), username.size(), 0)) == -1) 
       {
-         cerr << "Error: " << strerror(errno) << endl;
+         cerr << "Error sending username: " << strerror(errno) << endl;
          return -1;
       }
 
    password = getpass();
    if ((send(socket, password.c_str(), password.size(), 0)) == -1) {
-      cerr << "Error: " << strerror(errno) << endl;
+      cerr << "Error sending password: " << strerror(errno) << endl;
       return -1;
    }
 
-   return 1;
+   password.clear();
+
+   char buffer[256] = {0};
+   int size = recv(socket, buffer, sizeof(buffer) - 1, 0);
+   if (size <= 0)
+   {
+      cerr << "Error receiving server response: " << strerror(errno) << endl;
+      return -1;
+   }
+   buffer[size] = '\0';
+
+   if (strstr(buffer, "<< OK"))
+   {
+      cout << "Login successful!" << endl;
+      Client::isLoggedIn = true;
+      return 1;
+   }
+   else if (strstr(buffer, "<< ERR"))
+   {
+      cout << "Login failed: " << buffer << endl;
+      return -1;
+   }
+   else
+   {
+      cerr << "Unexpected server response: " << buffer << endl;
+      return -1;
+   }
 }
 
 int Client::sendCommand(int socket){

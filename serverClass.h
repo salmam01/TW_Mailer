@@ -51,6 +51,7 @@ class Server
 
     bool loginHandler(int clientSocket);
     bool establishLDAPConnection(const std::string& username, const std::string& password);
+    void sendLoginResponse(int clientSocket, bool success);
     void checkLoginAttempts();
     bool isBlackListed(std::string ip);
 

@@ -11,9 +11,10 @@ class Client
     int socket_fd;
     struct sockaddr_in server_address;
     char buffer[BUFFER_SIZE];
-    bool isLoggedIn = false;
 
     public:
+    bool isLoggedIn = false;
+    bool isQuit = false;
     Client(const char *ip, int port);
     bool connect_to_server();
     void receive_data();

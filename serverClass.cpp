@@ -290,40 +290,48 @@ void Server::commandHandler(int clientSocket, string command)
 //  Method that takes the client credentials and tries to log them in
 bool Server::loginHandler(int clientSocket)
 {
-  //  Get username and password using the parser
-  string username = parser(clientSocket);
-  if(username.empty())
-  {
-    cerr << "Username cannot be empty." << endl;
-    sendResponse(clientSocket, false);
-    return false;
-  }
-  cout << "Username: " << username << endl;
+    // Parse the username from the client
+    string username = parser(clientSocket);
+    if (username.empty())
+    {
+        cerr << "Username cannot be empty." << endl;
+        sendLoginResponse(clientSocket, false);
+        //sendResponse(clientSocket, false);
+        return false;
+    }
+    cout << "Username received: " << username << endl;
 
-  string password = parser(clientSocket);
-  if(password.empty())
-  {
-    cerr << "Password cannot be empty." << endl;
-    sendResponse(clientSocket, false);
-    return false;
-  }
-  cout << "Password works." << endl;
-  
-  lock_guard<mutex> lock(this->threadsMutex);
-  if (establishLDAPConnection(username, password))
-  {
-    cout << "Client logged in successfully" << endl;
-    this->username = username;
-    isLoggedIn = true;
-    sendResponse(clientSocket, true);
-    return true;
-  }
-  else
-  {
-    cerr << "LDAP authentication failed for user: " << username << endl;
-    sendResponse(clientSocket, false);
-    return false;
-  }
+    // Parse the password from the client
+    string password = parser(clientSocket);
+    if (password.empty())
+    {
+        cerr << "Password cannot be empty." << endl;
+        sendLoginResponse(clientSocket, false);
+        //sendResponse(clientSocket, false);
+        return false;
+    }
+    cout << "Password received." << endl;
+
+    // Lock to ensure thread safety if multiple threads handle requests
+    lock_guard<mutex> lock(this->threadsMutex);
+
+    // Authenticate via LDAP
+    if (establishLDAPConnection(username, password))
+    {
+        cout << "LDAP authentication successful for user: " << username << endl;
+        this->username = username; // Save the username for session tracking
+        isLoggedIn = true;         // Update login status
+        sendLoginResponse(clientSocket, true);
+        //sendResponse(clientSocket, true); // Send success response to client
+        return true;
+    }
+    else
+    {
+        cerr << "LDAP authentication failed for user: " << username << endl;
+        sendLoginResponse(clientSocket, false);
+        //sendResponse(clientSocket, false); // Send failure response to client
+        return false;
+    }
 }
 
 //  Method to connect to the LDAP server and check if the clients credentials are valid
@@ -374,6 +382,12 @@ bool Server::establishLDAPConnection(const string& username, const string& passw
   // Unbind from the server after authentication
   ldap_unbind_ext_s(ldapHandle, nullptr, nullptr);
   return true;
+}
+
+void Server::sendLoginResponse(int clientSocket, bool success)
+{
+    string response = success ? "<< OK: Login Successful" : "<< ERR: Invalid Credentials";
+    send(clientSocket, response.c_str(), response.size(), 0);
 }
 
 //  Method that keeps track of the clients login attempts and blacklists them if needed
