@@ -14,5 +14,5 @@ $(OUTPUT): $(SRCS) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(OUTPUT) $(LDFLAGS)
 
 # um die kompilierte binary zu löschen, build from scratch falls library/header probleme/änderungen
-clean:
-	rm -f $(OUTPUT)
+#clean:
+#	rm -f $(OUTPUT)
