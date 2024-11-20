@@ -12,8 +12,9 @@ void signalHandler(int sig)
     if(clientPtr != nullptr)
     {
       cerr << "Shutdown requested by Client." << endl;
-      clientPtr->closeConnection();
+      clientPtr->closeConnectionSignal();
     }
+    exit(0);
   }
 }
 
@@ -37,12 +38,12 @@ int main(int argc, char **argv)
     Client client(argv[1], port);
     clientPtr = &client;
 
-    if (!client.connect_to_server())
+    if (!client.connectToServer())
     {
         return EXIT_FAILURE;
     }
 
-    client.receive_data();  // Read initial data or welcome message
+    client.receiveData();  // Read initial data or welcome message
     
     if(signal(SIGINT, signalHandler) == SIG_ERR)
     {
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
 
     } while (!client.isQuit);
 
-    client.close_connection();
+    client.closeConnection();
 
     return EXIT_SUCCESS;
 }

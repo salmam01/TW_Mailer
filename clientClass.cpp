@@ -20,7 +20,7 @@ Client::Client(const char *ip, int port)
    inet_aton(ip, &server_address.sin_addr);
 }
 
-bool Client::connect_to_server()
+bool Client::connectToServer()
 {
    if (connect(socket_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
    {
@@ -31,17 +31,23 @@ bool Client::connect_to_server()
    return true;
 }
 
-void Client::closeConnection()
+void Client::closeConnectionSignal()
 {
-   string request = "QUIT\n";
-   cout << "Closing connection..." << endl;
-   if((send(this->socket_fd, request.c_str(), request.size(), 0)) == -1)
+   if (socket_fd != -1)
    {
-      cerr << "Error sending QUIT request to server." << endl;
+      string request = "QUIT\n";
+      cout << "Closing connection..." << endl;
+      if((send(this->socket_fd, request.c_str(), request.size(), 0)) == -1)
+      {
+         cerr << "Error sending QUIT request to server." << endl;
+      }
+      
+      isQuit = true;
+      closeConnection();
    }
 }
 
-void Client::receive_data()
+void Client::receiveData()
 {
    int size = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
    if (size == -1)
@@ -60,6 +66,13 @@ void Client::receive_data()
    memset(buffer, 0, BUFFER_SIZE);
 }
 
+/*
+int Client::commandHandler()
+{
+   
+}
+*/
+
 bool Client::send_command(const string &command)
 {
    if (send(socket_fd, command.c_str(), command.length(), 0) == -1)
@@ -70,7 +83,7 @@ bool Client::send_command(const string &command)
    return true;
 }
 
-void Client::close_connection()
+void Client::closeConnection()
 {
    if (socket_fd != -1)
    {
