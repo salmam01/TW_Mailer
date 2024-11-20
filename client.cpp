@@ -68,7 +68,7 @@ int main(int argc, char **argv)
         string command;
         getline(cin, command);
         transform(command.begin(), command.end(), command.begin(), ::toupper);
-        //client.commandHandler();
+
         if (!client.isLoggedIn)
         {
             // Handle commands allowed when not logged in

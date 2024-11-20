@@ -31,7 +31,7 @@
 #include <exception>
 //  for LDAP client library functions
 #include <ldap.h>
-
+// for manipulating Internet addresses
 #include <arpa/inet.h>
 //provides errno-variables and predefined ERR
 #include <cerrno>

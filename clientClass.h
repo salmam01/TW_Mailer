@@ -25,7 +25,6 @@ class Client
     void closeConnectionSignal();
     
     void receiveData();
-    int commandHandler(int socket);
     int loginCommand(int socket);
     int sendCommand(int socket);
     int listCommand(int socket);

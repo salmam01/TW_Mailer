@@ -3,9 +3,10 @@
 
 using namespace std;
 
+
 Client::Client(const char *ip, int port)
 {
-   // Initialize socket
+   // Initialize socket with IPv4 standard
    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
    if (socket_fd == -1)
    {
@@ -20,6 +21,7 @@ Client::Client(const char *ip, int port)
    inet_aton(ip, &server_address.sin_addr);
 }
 
+//connects to server using socket and server adress
 bool Client::connectToServer()
 {
    if (connect(socket_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1)
@@ -31,6 +33,7 @@ bool Client::connectToServer()
    return true;
 }
 
+//Used with SIGINT to send QUIT-request to server
 void Client::closeConnectionSignal()
 {
    if (socket_fd != -1)
@@ -47,6 +50,7 @@ void Client::closeConnectionSignal()
    }
 }
 
+//receives server_data, error-handling, memory-clearance
 void Client::receiveData()
 {
    int size = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
@@ -66,13 +70,7 @@ void Client::receiveData()
    memset(buffer, 0, BUFFER_SIZE);
 }
 
-/*
-int Client::commandHandler()
-{
-   
-}
-*/
-
+//sends command to server
 bool Client::sendCommandToServer(const string &command)
 {
    if (send(socket_fd, command.c_str(), command.length(), 0) == -1)
@@ -83,6 +81,7 @@ bool Client::sendCommandToServer(const string &command)
    return true;
 }
 
+//Shuts down and closes socket
 void Client::closeConnection()
 {
    if (socket_fd != -1)
@@ -108,7 +107,7 @@ char* Client::get_buffer()
 {
    return buffer;
 }
-
+// Selects message for the read and delete commands
 int Client::specificMessage(int socket)
 {
    string msgNumber;
@@ -123,6 +122,7 @@ int Client::specificMessage(int socket)
    return 1;
 }
 
+// used for hidden password: makes single character manipulatable during entry [getpass()]
 int Client::getch() 
 {
    int ch;
@@ -147,6 +147,7 @@ int Client::getch()
    return ch;
 }
 
+//prompts password, handles backspace/deletion
 string Client::getpass() 
 {
    const char BACKSPACE = 127;
@@ -176,6 +177,7 @@ string Client::getpass()
    return password;
 }
 
+//LOGIN: prompts user and pwd, sends to server, handles server-response
 int Client::loginCommand(int socket)
 {
    if ((send(socket, "LOGIN", 6, 0)) == -1) 
@@ -231,6 +233,7 @@ int Client::loginCommand(int socket)
    }
 }
 
+//produces message: receiver/subject/message, then sends to server
 int Client::sendCommand(int socket)
 {
    if ((send(socket, "SEND", 4, 0)) == -1) 
@@ -281,6 +284,7 @@ int Client::sendCommand(int socket)
    return 1;
 }
 
+//send LIST command to server
 int Client::listCommand(int socket)
 {
    if ((send(socket, "LIST", 4, 0)) == -1) 
@@ -292,6 +296,7 @@ int Client::listCommand(int socket)
    return 1;
 }
 
+//send READ command to server and calls specificMessage()
 int Client::readCommand(int socket)
 {
    if ((send(socket, "READ", 4, 0)) == -1) 
@@ -308,6 +313,7 @@ int Client::readCommand(int socket)
    return 1;
 }
 
+//Send DEL command to server and calls specificMessage()
 int Client::delCommand(int socket){
    if ((send(socket, "DEL", 4, 0)) == -1) 
    {
