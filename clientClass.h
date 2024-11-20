@@ -1,7 +1,7 @@
 #ifndef CLIENT_CLASS_H
 #define CLIENT_CLASS_H
 
-#include "clientHeaders.h"
+#include "allHeaders.h"
 
 #define BUFFER_SIZE 1024
 

@@ -4,7 +4,7 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 50
 
-#include "serverHeaders.h"
+#include "allHeaders.h"
 
 
 class Server

@@ -1,5 +1,5 @@
+#include "allHeaders.h"
 #include "serverClass.h"
-#include "serverHeaders.h"
 
 using namespace std;
 using namespace filesystem;

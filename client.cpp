@@ -1,4 +1,4 @@
-#include "clientHeaders.h"
+#include "allHeaders.h"
 #include "clientClass.cpp"
 
 using namespace std;
