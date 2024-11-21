@@ -18,7 +18,7 @@ void printUsage()
 //  Function that handles CTRL + C on client side
 void signalHandler(int sig)
 {
-  if(sig == SIGINT)
+  if(sig == SIGINT || sig == SIGHUP)
   {
     if(clientPtr != nullptr)
     {
@@ -59,6 +59,10 @@ int main(int argc, char **argv)
     if(signal(SIGINT, signalHandler) == SIG_ERR)
     {
         cerr << "Error registering signal." << endl;
+    }
+    if(signal(SIGHUP, signalHandler) == SIG_ERR)
+    {
+    cerr << "Error registering signal." << endl;
     }
 
     do
