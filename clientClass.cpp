@@ -29,7 +29,7 @@ bool Client::connectToServer()
       cerr << "Connection error - no server available" << endl;
       return false;
    }
-   cout << "Connection with server" << inet_ntoa(server_address.sin_addr) << "established" << endl;
+   cout << "Connection with server " << inet_ntoa(server_address.sin_addr) << " established" << endl;
    return true;
 }
 
@@ -215,13 +215,13 @@ int Client::loginCommand(int socket)
    }
    buffer[size] = '\0';
 
-   if (strstr(buffer, "<< OK"))
+   if (strstr(buffer, "OK\n"))
    {
       cout << "Login successful!" << endl;
       Client::isLoggedIn = true;
       return 1;
    }
-   else if (strstr(buffer, "<< ERR"))
+   else if (strstr(buffer, "ERR\n"))
    {
       cout << "Login failed: " << buffer << endl;
       return -1;

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "serverClass.cpp"
+#include "serverClass.h"
 
 using namespace std;
 

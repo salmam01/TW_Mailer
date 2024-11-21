@@ -1,5 +1,5 @@
 #include "allHeaders.h"
-#include "clientClass.cpp"
+#include "clientClass.h"
 
 using namespace std;
 
